@@ -1,0 +1,5 @@
+(library
+ (name firebase)
+ (libraries core js_of_ocaml)
+ (flags
+  (:standard -w +70 -warn-error +70)))

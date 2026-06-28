@@ -11,7 +11,7 @@ let post
   ~(on_err : string -> unit)
   : unit
   =
-  let user = Ffi.current_user () in
+  let user = Firebase.current_user () in
   if Ffi.is_nullish user
   then on_err "Not signed in"
   else

@@ -1,12 +1,12 @@
 open! Core
 open Js_of_ocaml
 
-(** Low-level js_of_ocaml helpers for talking to the global (compat) Firebase SDK,
-    [fetch], and for reading fields out of plain JS objects returned by Firestore. *)
+(** Low-level js_of_ocaml helpers for [fetch], promises, the window/location, and for
+    reading fields out of plain JS objects returned by Firestore. The Firebase SDK
+    bindings themselves live in the {!Firebase} library. *)
 
 type any = Js.Unsafe.any
 
-let global : Js.Unsafe.any = Js.Unsafe.coerce Js.Unsafe.global
 let inject = Js.Unsafe.inject
 let str = Js.string
 
@@ -86,57 +86,6 @@ let promise_then (p : any) ~(on_ok : any -> unit) ~(on_err : any -> unit) : unit
   in
   ()
 ;;
-
-(* ---- Firebase (compat global) ---- *)
-
-let firebase () : any = get global "firebase"
-
-let init_app (config : (string * any) list) : unit =
-  let _ : any = Js.Unsafe.meth_call (firebase ()) "initializeApp" [| inject (obj config) |] in
-  ()
-;;
-
-let auth () : any = Js.Unsafe.meth_call (firebase ()) "auth" [||]
-let firestore () : any = Js.Unsafe.meth_call (firebase ()) "firestore" [||]
-let current_user () : any = get (auth ()) "currentUser"
-
-(* doc reference at db/lobbies/<name> (and nested) via collection/doc chaining *)
-let doc (path : string list) : any =
-  let db = firestore () in
-  let rec go ref = function
-    | [] -> ref
-    | coll :: id :: rest ->
-      let c = Js.Unsafe.meth_call ref "collection" [| inject (str coll) |] in
-      let d = Js.Unsafe.meth_call c "doc" [| inject (str id) |] in
-      go d rest
-    | [ coll ] ->
-      Js.Unsafe.meth_call ref "collection" [| inject (str coll) |]
-  in
-  go db path
-;;
-
-(** Subscribe with onSnapshot; returns the unsubscribe thunk. *)
-let on_snapshot (doc_ref : any) ~(on_next : any -> unit) ~(on_error : any -> unit) : unit -> unit =
-  let unsub : any =
-    Js.Unsafe.meth_call
-      doc_ref
-      "onSnapshot"
-      [| inject (Js.wrap_callback on_next); inject (Js.wrap_callback on_error) |]
-  in
-  fun () ->
-    let _ : any = Js.Unsafe.fun_call unsub [||] in
-    ()
-;;
-
-let get_doc (doc_ref : any) ~(on_ok : any -> unit) ~(on_err : any -> unit) : unit =
-  promise_then (Js.Unsafe.meth_call doc_ref "get" [||]) ~on_ok ~on_err
-;;
-
-(* In the compat (namespaced) SDK, DocumentSnapshot.exists is a boolean property, not a
-   method (unlike the modular SDK's exists()). *)
-let snapshot_exists (snap : any) : bool = Js.to_bool (Js.Unsafe.coerce (get snap "exists"))
-
-let snapshot_data (snap : any) : any = Js.Unsafe.meth_call snap "data" [||]
 
 (* ---- window / location ---- *)
 

@@ -1,8 +1,9 @@
 open! Core
 open Js_of_ocaml
 
-(** Low-level js_of_ocaml helpers for the compat Firebase SDK, [fetch], and reading
-    fields out of plain JS objects. Only the helpers used by other modules are exposed. *)
+(** Low-level js_of_ocaml helpers for [fetch], promises, the window/location, and reading
+    fields out of plain JS objects. Firebase SDK bindings live in the {!Firebase} library.
+    Only the helpers used by other modules are exposed. *)
 
 (** An opaque JavaScript value. *)
 type any = Js.Unsafe.any
@@ -31,16 +32,6 @@ val of_str_list : string list -> any
 
 (* promises *)
 val promise_then : any -> on_ok:(any -> unit) -> on_err:(any -> unit) -> unit
-
-(* Firebase (compat global) *)
-val init_app : (string * any) list -> unit
-val auth : unit -> any
-val current_user : unit -> any
-val doc : string list -> any
-val on_snapshot : any -> on_next:(any -> unit) -> on_error:(any -> unit) -> unit -> unit
-val get_doc : any -> on_ok:(any -> unit) -> on_err:(any -> unit) -> unit
-val snapshot_exists : any -> bool
-val snapshot_data : any -> any
 
 (* window / location *)
 val window_origin : unit -> string

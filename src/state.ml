@@ -175,7 +175,7 @@ let unsubscribe_from_lobby () =
 
 let role_doc_updated snap =
   let rd =
-    if Ffi.snapshot_exists snap then Parse.role_doc (Ffi.snapshot_data snap) else None
+    if Firebase.snapshot_exists snap then Parse.role_doc (Firebase.snapshot_data snap) else None
   in
   update_lobby ~f:(fun l -> { l with role = rd })
 ;;
@@ -185,10 +185,10 @@ let lobby_doc_updated snap =
   match m.lobby with
   | None -> ()
   | Some lob ->
-    if not (Ffi.snapshot_exists snap)
+    if not (Firebase.snapshot_exists snap)
     then unsubscribe_from_lobby ()
     else (
-      let new_data = Parse.lobby_data (Ffi.snapshot_data snap) in
+      let new_data = Parse.lobby_data (Firebase.snapshot_data snap) in
       let game = Game.create new_data.game ~role_map:Avalonlib.role_map in
       let old_data = lob.data in
       let base =
@@ -275,11 +275,11 @@ let subscribe_to_lobby name =
     let uid = Option.value_map m.user ~default:"" ~f:(fun u -> u.uid) in
     set { m with lobby = Some { name; connected = false; data = None; role = None; game = None } };
     let u1 =
-      Ffi.on_snapshot (Ffi.doc [ "lobbies"; name ]) ~on_next:lobby_doc_updated ~on_error:(fun _ -> ())
+      Firebase.on_snapshot (Firebase.doc [ "lobbies"; name ]) ~on_next:lobby_doc_updated ~on_error:(fun _ -> ())
     in
     let u2 =
-      Ffi.on_snapshot
-        (Ffi.doc [ "lobbies"; name; "roles"; uid ])
+      Firebase.on_snapshot
+        (Firebase.doc [ "lobbies"; name; "roles"; uid ])
         ~on_next:role_doc_updated
         ~on_error:(fun _ -> ())
     in
@@ -289,9 +289,9 @@ let subscribe_to_lobby name =
 (* ---- user doc + auth ---- *)
 let user_doc_updated snap =
   update ~f:(fun m -> { m with auth_initialized = true });
-  if not (Ffi.snapshot_exists snap)
+  if not (Firebase.snapshot_exists snap)
   then (
-    let au = Ffi.current_user () in
+    let au = Firebase.current_user () in
     if not (Ffi.is_nullish au)
     then (
       let uid = Ffi.field_string au "uid" in
@@ -302,7 +302,7 @@ let user_doc_updated snap =
       update ~f:(fun m ->
         { m with user = Some { uid; name; email; lobby = None; stats = None } })))
   else (
-    let u = Parse.user_data (Ffi.snapshot_data snap) in
+    let u = Parse.user_data (Firebase.snapshot_data snap) in
     update ~f:(fun m -> { m with user = Some u });
     let m = model () in
     match u.lobby, m.lobby with
@@ -319,14 +319,9 @@ let on_auth_state_changed user =
   then (
     (match Ffi.url_get_param "confirmEmail" with
      | Some email ->
-       let p =
-         Js.Unsafe.meth_call
-           (Ffi.auth ())
-           "signInWithEmailLink"
-           [| Ffi.of_string email; Ffi.of_string (Ffi.window_href ()) |]
-       in
-       Ffi.promise_then
-         p
+       Firebase.sign_in_with_email_link
+         ~email
+         ~href:(Ffi.window_href ())
          ~on_ok:(fun _ ->
            update ~f:(fun m -> { m with confirming_email_error = None });
            Ffi.replace_state_to_pathname ())
@@ -349,16 +344,16 @@ let on_auth_state_changed user =
        creates the user doc; otherwise createLobby fails with "No such user". *)
     Api.login (Ffi.field_string_opt user "email");
     let unsub =
-      Ffi.on_snapshot
-        (Ffi.doc [ "users"; Ffi.field_string user "uid" ])
+      Firebase.on_snapshot
+        (Firebase.doc [ "users"; Ffi.field_string user "uid" ])
         ~on_next:user_doc_updated
         ~on_error:(fun _ -> ())
     in
     user_doc_unsub := Some unsub;
-    Ffi.get_doc
-      (Ffi.doc [ "stats"; "global" ])
+    Firebase.get_doc
+      (Firebase.doc [ "stats"; "global" ])
       ~on_ok:(fun snap ->
-        let d = Ffi.snapshot_data snap in
+        let d = Firebase.snapshot_data snap in
         if not (Ffi.is_nullish d)
         then update ~f:(fun m -> { m with global_stats = Some (Parse.stats d) }))
       ~on_err:(fun _ -> ());
@@ -366,16 +361,15 @@ let on_auth_state_changed user =
 ;;
 
 let init () =
-  Ffi.init_app firebase_config;
-  if Ffi.url_has_param "purchaseSuccess"
-  then Ffi.alert "Thank you. Your support means a lot."
-  else if Ffi.url_has_param "purchaseCanceled"
-  then Ffi.alert "Maybe next time?";
-  let cb = Js.wrap_callback (fun user -> on_auth_state_changed user) in
-  let _ : Ffi.any =
-    Js.Unsafe.meth_call (Ffi.auth ()) "onAuthStateChanged" [| Ffi.inject cb |]
-  in
-  ()
+  (* The modular SDK is imported asynchronously (ESM, no bundler), so defer all Firebase
+     setup until the window.__fb shim is available. *)
+  Firebase.on_ready (fun () ->
+    Firebase.init firebase_config;
+    if Ffi.url_has_param "purchaseSuccess"
+    then Ffi.alert "Thank you. Your support means a lot."
+    else if Ffi.url_has_param "purchaseCanceled"
+    then Ffi.alert "Maybe next time?";
+    Firebase.on_auth_state_changed (fun user -> on_auth_state_changed user))
 ;;
 
 (* ---- actions invoked by the UI ---- *)
@@ -490,16 +484,10 @@ let assassinate ?(on_ok = noop_ok) ?(on_err = noop_err) target =
     ()
 ;;
 
-let logout () =
-  let _ : Ffi.any = Js.Unsafe.meth_call (Ffi.auth ()) "signOut" [||] in
-  ()
-;;
+let logout () = Firebase.sign_out ()
 
 let sign_in_anonymously ?(on_err = noop_err) () =
-  Ffi.promise_then
-    (Js.Unsafe.meth_call (Ffi.auth ()) "signInAnonymously" [||])
-    ~on_ok:(fun _ -> ())
-    ~on_err:(fun e -> on_err (Ffi.field_string e "message"))
+  Firebase.sign_in_anonymously ~on_err:(fun e -> on_err (Ffi.field_string e "message"))
 ;;
 
 let email_regex_ok email =
@@ -520,11 +508,9 @@ let send_sign_in_link ~email ~on_ok ~on_err =
          [| Ffi.of_string (hostname ^ "?confirmEmail=" ^ email) |])
   in
   let settings = Ffi.obj [ "url", Ffi.of_string url; "handleCodeInApp", Ffi.of_bool true ] in
-  Ffi.promise_then
-    (Js.Unsafe.meth_call
-       (Ffi.auth ())
-       "sendSignInLinkToEmail"
-       [| Ffi.of_string email; Ffi.inject settings |])
+  Firebase.send_sign_in_link_to_email
+    ~email
+    ~settings
     ~on_ok:(fun _ -> on_ok ())
     ~on_err:(fun e -> on_err (Ffi.field_string e "message"))
 ;;
