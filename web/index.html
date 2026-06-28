@@ -10,10 +10,26 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" />
     <!-- App styles are injected at runtime by ppx_css (see src/style.ml). -->
 
-    <!-- Tree-shaken, self-hosted Firebase v12 modular bundle (built from firebase/shim/).
-         Populates window.__fb and dispatches `firebase-ready`; the OCaml side
-         (Firebase.on_ready) waits for it. Self-hosted = no runtime gstatic.com dependency. -->
-    <script defer src="firebase-shim.js"></script>
+    <!-- Firebase v12 *modular* SDK. No bundler, so import the ESM build and re-export the
+         functions our bindings need on window.__fb, then signal readiness. The OCaml side
+         (Firebase.on_ready) waits for this before initializing. -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+      import {
+        getAuth, onAuthStateChanged, signInAnonymously,
+        signInWithEmailLink, sendSignInLinkToEmail, signOut,
+      } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+      import {
+        getFirestore, doc, onSnapshot, getDoc,
+      } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+      window.__fb = {
+        initializeApp,
+        getAuth, onAuthStateChanged, signInAnonymously,
+        signInWithEmailLink, sendSignInLinkToEmail, signOut,
+        getFirestore, doc, onSnapshot, getDoc,
+      };
+      window.dispatchEvent(new Event("firebase-ready"));
+    </script>
   </head>
   <body>
     <div id="app"></div>
