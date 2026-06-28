@@ -8,15 +8,15 @@ open Types
     Firebase listeners and UI actions push new snapshots into it. This replaces the Vue
     [AvalonGame] + [LobbySubscription] + [GameConfig] objects and the mitt EventBus. *)
 
-let firebase_config : (string * Ffi.any) list =
-  [ "apiKey", Ffi.of_string "AIzaSyCwhCvO8NbTusBaHmHHnNT7yC0_11UL2RI"
-  ; "authDomain", Ffi.of_string "georgyo-avalon.firebaseapp.com"
-  ; "databaseURL", Ffi.of_string "https://georgyo-avalon-default-rtdb.firebaseio.com"
-  ; "projectId", Ffi.of_string "georgyo-avalon"
-  ; "storageBucket", Ffi.of_string "georgyo-avalon.appspot.com"
-  ; "messagingSenderId", Ffi.of_string "1000859874531"
-  ; "appId", Ffi.of_string "1:1000859874531:web:789f785c58c574bff181d6"
-  ]
+let firebase_config : Firebase.config =
+  { api_key = "AIzaSyCwhCvO8NbTusBaHmHHnNT7yC0_11UL2RI"
+  ; auth_domain = "georgyo-avalon.firebaseapp.com"
+  ; database_url = "https://georgyo-avalon-default-rtdb.firebaseio.com"
+  ; project_id = "georgyo-avalon"
+  ; storage_bucket = "georgyo-avalon.appspot.com"
+  ; messaging_sender_id = "1000859874531"
+  ; app_id = "1:1000859874531:web:789f785c58c574bff181d6"
+  }
 ;;
 
 module Model = struct
@@ -175,7 +175,7 @@ let unsubscribe_from_lobby () =
 
 let role_doc_updated snap =
   let rd =
-    if Firebase.snapshot_exists snap then Parse.role_doc (Firebase.snapshot_data snap) else None
+    if Firebase.exists snap then Parse.role_doc (Option.value_exn (Firebase.data snap)) else None
   in
   update_lobby ~f:(fun l -> { l with role = rd })
 ;;
@@ -185,10 +185,10 @@ let lobby_doc_updated snap =
   match m.lobby with
   | None -> ()
   | Some lob ->
-    if not (Firebase.snapshot_exists snap)
+    if not (Firebase.exists snap)
     then unsubscribe_from_lobby ()
     else (
-      let new_data = Parse.lobby_data (Firebase.snapshot_data snap) in
+      let new_data = Parse.lobby_data (Option.value_exn (Firebase.data snap)) in
       let game = Game.create new_data.game ~role_map:Avalonlib.role_map in
       let old_data = lob.data in
       let base =
@@ -289,20 +289,18 @@ let subscribe_to_lobby name =
 (* ---- user doc + auth ---- *)
 let user_doc_updated snap =
   update ~f:(fun m -> { m with auth_initialized = true });
-  if not (Firebase.snapshot_exists snap)
+  if not (Firebase.exists snap)
   then (
-    let au = Firebase.current_user () in
-    if not (Ffi.is_nullish au)
-    then (
-      let uid = Ffi.field_string au "uid" in
-      let name =
-        Option.value (Ffi.field_string_opt au "displayName") ~default:"Anonymous"
-      in
-      let email = Ffi.field_string_opt au "email" in
+    match Firebase.current_user () with
+    | None -> ()
+    | Some au ->
+      let uid = Firebase.uid au in
+      let name = Option.value (Firebase.display_name au) ~default:"Anonymous" in
+      let email = Firebase.email au in
       update ~f:(fun m ->
-        { m with user = Some { uid; name; email; lobby = None; stats = None } })))
+        { m with user = Some { uid; name; email; lobby = None; stats = None } }))
   else (
-    let u = Parse.user_data (Firebase.snapshot_data snap) in
+    let u = Parse.user_data (Option.value_exn (Firebase.data snap)) in
     update ~f:(fun m -> { m with user = Some u });
     let m = model () in
     match u.lobby, m.lobby with
@@ -314,21 +312,21 @@ let user_doc_updated snap =
     | _ -> ())
 ;;
 
-let on_auth_state_changed user =
-  if Ffi.is_nullish user
-  then (
+let on_auth_state_changed (user : Firebase.user option) =
+  match user with
+  | None ->
     (match Ffi.url_get_param "confirmEmail" with
      | Some email ->
        Firebase.sign_in_with_email_link
          ~email
-         ~href:(Ffi.window_href ())
-         ~on_ok:(fun _ ->
+         ~link:(Ffi.window_href ())
+         ~on_ok:(fun () ->
            update ~f:(fun m -> { m with confirming_email_error = None });
            Ffi.replace_state_to_pathname ())
          ~on_err:(fun e ->
            update ~f:(fun m ->
              { m with
-               confirming_email_error = Some (Ffi.field_string e "message")
+               confirming_email_error = Some (Firebase.error_message e)
              ; auth_initialized = true
              });
            Ffi.replace_state_to_pathname ())
@@ -338,14 +336,14 @@ let on_auth_state_changed user =
        u ();
        user_doc_unsub := None
      | None -> ());
-    update ~f:(fun m -> { m with user = None }))
-  else (
+    update ~f:(fun m -> { m with user = None })
+  | Some user ->
     (* Call login unconditionally (even for anonymous users with no email) so the server
        creates the user doc; otherwise createLobby fails with "No such user". *)
-    Api.login (Ffi.field_string_opt user "email");
+    Api.login (Firebase.email user);
     let unsub =
       Firebase.on_snapshot
-        (Firebase.doc [ "users"; Ffi.field_string user "uid" ])
+        (Firebase.doc [ "users"; Firebase.uid user ])
         ~on_next:user_doc_updated
         ~on_error:(fun _ -> ())
     in
@@ -353,11 +351,11 @@ let on_auth_state_changed user =
     Firebase.get_doc
       (Firebase.doc [ "stats"; "global" ])
       ~on_ok:(fun snap ->
-        let d = Firebase.snapshot_data snap in
-        if not (Ffi.is_nullish d)
-        then update ~f:(fun m -> { m with global_stats = Some (Parse.stats d) }))
+        match Firebase.data snap with
+        | Some d -> update ~f:(fun m -> { m with global_stats = Some (Parse.stats d) })
+        | None -> ())
       ~on_err:(fun _ -> ());
-    Ffi.replace_state_to_pathname ())
+    Ffi.replace_state_to_pathname ()
 ;;
 
 let init () =
@@ -487,7 +485,7 @@ let assassinate ?(on_ok = noop_ok) ?(on_err = noop_err) target =
 let logout () = Firebase.sign_out ()
 
 let sign_in_anonymously ?(on_err = noop_err) () =
-  Firebase.sign_in_anonymously ~on_err:(fun e -> on_err (Ffi.field_string e "message"))
+  Firebase.sign_in_anonymously ~on_err:(fun e -> on_err (Firebase.error_message e))
 ;;
 
 let email_regex_ok email =
@@ -507,12 +505,12 @@ let send_sign_in_link ~email ~on_ok ~on_err =
          (Js.Unsafe.js_expr "encodeURI")
          [| Ffi.of_string (hostname ^ "?confirmEmail=" ^ email) |])
   in
-  let settings = Ffi.obj [ "url", Ffi.of_string url; "handleCodeInApp", Ffi.of_bool true ] in
+  let settings = { Firebase.url; handle_code_in_app = true } in
   Firebase.send_sign_in_link_to_email
     ~email
     ~settings
-    ~on_ok:(fun _ -> on_ok ())
-    ~on_err:(fun e -> on_err (Ffi.field_string e "message"))
+    ~on_ok
+    ~on_err:(fun e -> on_err (Firebase.error_message e))
 ;;
 
 let submit_email_addr ?(on_ok = noop_ok) ?(on_err = noop_err) email =

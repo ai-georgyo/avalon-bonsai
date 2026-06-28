@@ -11,19 +11,19 @@ let post
   ~(on_err : string -> unit)
   : unit
   =
-  let user = Firebase.current_user () in
-  if Ffi.is_nullish user
-  then on_err "Not signed in"
-  else
-    Ffi.promise_then
-      (Js.Unsafe.meth_call user "getIdToken" [| Ffi.of_bool false |])
+  match Firebase.current_user () with
+  | None -> on_err "Not signed in"
+  | Some user ->
+    Firebase.get_id_token
+      user
+      ~force_refresh:false
       ~on_err:(fun _ -> on_err "Could not get auth token")
       ~on_ok:(fun id_token ->
         let url = "/api/" ^ endpoint in
         let headers =
           Ffi.obj
             [ "Content-Type", Ffi.of_string "application/json"
-            ; "X-Avalon-Auth", id_token
+            ; "X-Avalon-Auth", Ffi.of_string id_token
             ]
         in
         let body =
