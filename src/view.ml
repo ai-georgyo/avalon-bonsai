@@ -395,6 +395,22 @@ let game_lobby (local_ graph) =
 (* ============================ GameMissions ============================ *)
 let game_missions (local_ graph) =
   let active, set_active = Bonsai.state 0 graph in
+  (* follow the current mission as the game progresses (original watched currentMissionIdx) *)
+  let midx =
+    let%arr m = State.value () in
+    match D.game m with
+    | Some g -> g.current_mission_idx
+    | None -> -1
+  in
+  let () =
+    Bonsai.Edge.on_change
+      midx
+      ~equal:Int.equal
+      ~callback:
+        (let%arr set_active = set_active in
+         fun i -> if i >= 0 && i < 5 then set_active i else Effect.return ())
+      graph
+  in
   let%arr m = State.value () and active = active and set_active = set_active in
   match D.game m with
   | None -> N.none
