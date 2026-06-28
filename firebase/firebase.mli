@@ -1,12 +1,12 @@
 open Js_of_ocaml
 
-(** Typed bindings to the Firebase v12 modular JS SDK, called through the [window.__fb]
-    shim that [web/index.html] installs from the ESM build (no bundler).
+(** Typed bindings to the Firebase v12 modular JS SDK. {!on_ready} loads the ESM build
+    itself via a runtime dynamic [import()] (no bundler) before any call is made.
 
     The handle types below are abstract and distinct, modeled on the [@firebase/auth] and
     [@firebase/firestore] TypeScript definitions, so the type checker rejects mixing them
     up and callers read JS objects only through the typed accessors here. Wrap setup in
-    {!on_ready} so it runs after the asynchronous ESM import has populated the global. *)
+    {!on_ready} so it runs after the asynchronous dynamic import has completed. *)
 
 (** [User] — an authenticated user. *)
 type user

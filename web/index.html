@@ -10,26 +10,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" />
     <!-- App styles are injected at runtime by ppx_css (see src/style.ml). -->
 
-    <!-- Firebase v12 *modular* SDK. No bundler, so import the ESM build and re-export the
-         functions our bindings need on window.__fb, then signal readiness. The OCaml side
-         (Firebase.on_ready) waits for this before initializing. -->
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-      import {
-        getAuth, onAuthStateChanged, signInAnonymously,
-        signInWithEmailLink, sendSignInLinkToEmail, signOut,
-      } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
-      import {
-        getFirestore, doc, onSnapshot, getDoc,
-      } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
-      window.__fb = {
-        initializeApp,
-        getAuth, onAuthStateChanged, signInAnonymously,
-        signInWithEmailLink, sendSignInLinkToEmail, signOut,
-        getFirestore, doc, onSnapshot, getDoc,
-      };
-      window.dispatchEvent(new Event("firebase-ready"));
-    </script>
+    <!-- Firebase v12 *modular* SDK is loaded by the app itself via dynamic import()
+         (see Firebase.on_ready in firebase/firebase.ml). These modulepreload hints just let
+         the browser fetch the entry points in parallel with main.bc.js; keep the version in
+         sync with firebasejs_base there. -->
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js" />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js" />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js" />
   </head>
   <body>
     <div id="app"></div>

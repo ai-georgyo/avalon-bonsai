@@ -9,9 +9,9 @@ open Js_of_ocaml
     passed where a reference is expected, and JS objects are read only through the typed
     accessors below — never via raw [Js.Unsafe] in callers.
 
-    The project has no bundler, so the modular ESM entry points are imported in
-    [web/index.html] and re-exported on the global [window.__fb]; wrap setup in {!on_ready}
-    so it runs only after that asynchronous import has populated the global. *)
+    The project has no bundler: {!on_ready} loads the modular ESM entry points itself via a
+    runtime dynamic [import()] and merges their exports into one lookup object. Wrap setup in
+    {!on_ready} so it runs only after that asynchronous import has completed. *)
 
 type any = Js.Unsafe.any
 type user = any
@@ -36,7 +36,6 @@ type action_code_settings =
 
 let str = Js.string
 let inject = Js.Unsafe.inject
-let global = Js.Unsafe.global
 
 let is_nullish (v : any) : bool =
   Js.to_bool (Js.Unsafe.fun_call (Js.Unsafe.js_expr "(function(x){return x===undefined||x===null;})") [| inject v |])
@@ -50,8 +49,16 @@ let field_string_opt (o : any) (k : string) : string option =
 let field_string ?(default = "") o k = Option.value (field_string_opt o k) ~default
 let to_opt (v : any) : any option = if is_nullish v then None else Some v
 
-(* The shim object installed by the ESM loader. *)
-let api () : any = Js.Unsafe.get global (str "__fb")
+(* The merged exports of the modular ESM entry points, populated by {!on_ready} via dynamic
+   import; [call] dispatches a free function by name. *)
+let exports_ref : any option ref = ref None
+
+let api () : any =
+  match !exports_ref with
+  | Some e -> e
+  | None -> failwith "Firebase modules are not loaded; run inside Firebase.on_ready"
+;;
+
 let call (name : string) (args : any array) : any = Js.Unsafe.fun_call (Js.Unsafe.get (api ()) (str name)) args
 
 let promise_then (p : any) ~(on_ok : any -> unit) ~(on_err : error -> unit) : unit =
@@ -154,14 +161,34 @@ let error_code (e : error) : string = field_string e "code"
 
 (* ---- readiness ---- *)
 
+let firebasejs_base = "https://www.gstatic.com/firebasejs/12.3.0/"
+
+(* Load the three modular entry points in parallel via runtime dynamic [import()] and merge
+   their named exports into one object (Object.assign over the module namespaces), then run
+   [f]. Repeat calls reuse the already-loaded exports. *)
 let on_ready (f : unit -> unit) : unit =
-  if not (is_nullish (api ()))
-  then f ()
-  else (
-    let handler = Js.wrap_callback (fun (_ : any) -> f ()) in
-    ignore
-      (Js.Unsafe.fun_call
-         (Js.Unsafe.js_expr "(function(h){window.addEventListener('firebase-ready',h,{once:true});})")
-         [| inject handler |]
-        : any))
+  match !exports_ref with
+  | Some _ -> f ()
+  | None ->
+    let load =
+      Js.Unsafe.fun_call
+        (Js.Unsafe.js_expr
+           "(function(a,b,c){return Promise.all([import(a),import(b),import(c)]).then(function(m){return \
+            Object.assign({},m[0],m[1],m[2]);});})")
+        [| inject (str (firebasejs_base ^ "firebase-app.js"))
+         ; inject (str (firebasejs_base ^ "firebase-auth.js"))
+         ; inject (str (firebasejs_base ^ "firebase-firestore.js"))
+        |]
+    in
+    promise_then
+      load
+      ~on_ok:(fun merged ->
+        exports_ref := Some merged;
+        f ())
+      ~on_err:(fun e ->
+        ignore
+          (Js.Unsafe.fun_call
+             (Js.Unsafe.js_expr "(function(e){console.error('Failed to load Firebase SDK',e);})")
+             [| inject e |]
+            : any))
 ;;

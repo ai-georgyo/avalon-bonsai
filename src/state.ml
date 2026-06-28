@@ -360,7 +360,7 @@ let on_auth_state_changed (user : Firebase.user option) =
 
 let init () =
   (* The modular SDK is imported asynchronously (ESM, no bundler), so defer all Firebase
-     setup until the window.__fb shim is available. *)
+     setup until [on_ready] has dynamically imported it. *)
   Firebase.on_ready (fun () ->
     Firebase.init firebase_config;
     if Ffi.url_has_param "purchaseSuccess"
