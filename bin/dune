@@ -1,0 +1,21 @@
+(executable
+ (name main)
+ (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
+ (js_of_ocaml
+  (flags (--effects cps))
+  (javascript_files runtime_avalon.js))
+ (modes js))
+
+(rule
+ (target index.html)
+ (deps ../web/index.html)
+ (action
+  (copy %{deps} %{target})))
+
+(rule
+ (target style.css)
+ (deps ../web/style.css)
+ (action
+  (copy %{deps} %{target})))

@@ -1,0 +1,5 @@
+(library
+ (name avalon)
+ (libraries core bonsai bonsai_web virtual_dom js_of_ocaml)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai)))
