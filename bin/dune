@@ -15,3 +15,9 @@
  (deps ../web/index.html)
  (action
   (copy %{deps} %{target})))
+
+(rule
+ (target firebase-shim.js)
+ (deps ../web/firebase-shim.js)
+ (action
+  (copy %{deps} %{target})))
