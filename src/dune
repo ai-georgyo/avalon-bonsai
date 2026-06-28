@@ -1,5 +1,7 @@
 (library
  (name avalon)
  (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon_core)
+ (flags
+  (:standard -w +70 -warn-error +70))
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai ppx_css ppx_html)))

@@ -2,5 +2,7 @@
  (name avalon_tests)
  (libraries core avalon_core)
  (inline_tests)
+ (flags
+  (:standard -w +70 -warn-error +70))
  (preprocess
   (pps ppx_jane)))

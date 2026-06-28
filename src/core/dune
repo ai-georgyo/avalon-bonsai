@@ -1,5 +1,7 @@
 (library
  (name avalon_core)
  (libraries core)
+ (flags
+  (:standard -w +70 -warn-error +70))
  (preprocess
   (pps ppx_jane)))
