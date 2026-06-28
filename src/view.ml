@@ -225,35 +225,68 @@ let user_login (local_ graph) =
         ~on_err:(fun e -> run (set_error e); run (set_submitting false)))
   in
   let anon = eff (fun () -> run (set_error ""); State.sign_in_anonymously ~on_err:(fun e -> run (set_error e)) ()) in
-  card ~cls:[ "welcome" ]
-    [ div ~cls:[ "col"; "center" ]
-        [ (match m.confirming_email_error with
-           | Some e -> N.div ~attrs:[ A.class_ "alert-error" ] [ textf "%s Please try logging in again." e ]
-           | None -> N.none)
-        ; div ~cls:[ "welcome-title" ]
-            [ spanc ~cls:[ "welcome-heading" ] [ N.text "Avalon: The Resistance "; spanc ~cls:[ "thin" ] [ N.text "Online" ] ]
-            ; N.p ~attrs:[ A.class_ "mt-4" ] [ spanc ~cls:[ "subtitle" ] [ N.text "A game of social deduction for 5 to 10 people, now on desktop and mobile." ] ]
-            ]
-        ; div ~cls:[ "tabs" ]
-            [ btn ~cls:(if String.equal tab "email" then [ "tab"; "tab-active" ] else [ "tab" ]) ~on_click:(set_tab "email") [ N.text "Email" ]
-            ; btn ~cls:(if String.equal tab "anonymous" then [ "tab"; "tab-active" ] else [ "tab" ]) ~on_click:(set_tab "anonymous") [ N.text "Anonymous" ]
-            ]
-        ; (if String.equal tab "email"
-           then
-             div ~cls:[ "pa-4"; "login-form" ]
-               (if not submitted
-                then
-                  [ text_field ~typ:"email" ~placeholder:"Email Address" ~value:email ~on_input:(fun s -> set_email s) ~extra:[ on_enter submit_email ] ()
-                  ; field_error error
-                  ; btn ~loading:submitting ~on_click:submit_email [ N.text "Login" ]
-                  ]
-                else
-                  [ card ~cls:[ "info-card" ] [ card_text ~cls:[ "center" ] [ N.p [ N.text "Check your email for the verification link" ] ] ]
-                  ; btn ~cls:[ "mt-4" ] ~on_click:(set_submitted false) [ N.text "Try Again" ]
-                  ])
-           else div ~cls:[ "pa-4" ] [ btn ~on_click:anon [ N.text "Login" ]; field_error error ])
+  (* Rendered with ppx_html + the ppx_css [Style] module (scoped, co-located CSS). *)
+  let field_err = if String.is_empty error then N.none else {%html.jsx|<div *{[ Style.field_error ]}>#{error}</div>|} in
+  let alert =
+    match m.confirming_email_error with
+    | Some e -> {%html.jsx|<div *{[ Style.alert_error ]}>%{textf "%s Please try logging in again." e}</div>|}
+    | None -> N.none
+  in
+  let tab_button value label =
+    let attrs = if String.equal tab value then [ Style.btn; Style.tab; Style.tab_active ] else [ Style.btn; Style.tab ] in
+    {%html.jsx|<button *{attrs} on_click=%{fun _ -> set_tab value}>#{label}</button>|}
+  in
+  let email_pane =
+    if not submitted
+    then (
+      let input_attrs =
+        [ Style.text_field; A.type_ "email"; A.placeholder "Email Address"; A.value_prop email
+        ; A.on_input (fun _ s -> set_email s); on_enter submit_email
         ]
-    ]
+      in
+      let login_attrs = Style.btn :: Style.primary :: (if submitting then [ A.disabled' true ] else []) in
+      let login_label = if submitting then {%html.jsx|<span *{[ Style.spinner ]}></span>|} else N.text "Login" in
+      {%html.jsx|
+        <div *{[ Style.pa_4; Style.login_form ]}>
+          <input *{input_attrs} />
+          %{field_err}
+          <button *{login_attrs} on_click=%{fun _ -> submit_email}>%{login_label}</button>
+        </div>
+      |})
+    else
+      {%html.jsx|
+        <div *{[ Style.pa_4; Style.login_form ]}>
+          <div *{[ Style.card; Style.info_card ]}>
+            <div *{[ Style.card_text; Style.center ]}><p>Check your email for the verification link</p></div>
+          </div>
+          <button *{[ Style.btn; Style.mt_4 ]} on_click=%{fun _ -> set_submitted false}>Try Again</button>
+        </div>
+      |}
+  in
+  let anon_pane =
+    {%html.jsx|
+      <div *{[ Style.pa_4 ]}>
+        <button *{[ Style.btn; Style.primary ]} on_click=%{fun _ -> anon}>Login</button>
+        %{field_err}
+      </div>
+    |}
+  in
+  {%html.jsx|
+    <div *{[ Style.card; Style.welcome ]}>
+      <div *{[ Style.col; Style.center ]}>
+        %{alert}
+        <div *{[ Style.card_title ]}>
+          <span *{[ Style.welcome_heading ]}>Avalon: The Resistance <span *{[ Style.thin ]}>Online</span></span>
+          <p *{[ Style.mt_4 ]}><span *{[ Style.subtitle ]}>A game of social deduction for 5 to 10 people, now on desktop and mobile.</span></p>
+        </div>
+        <div *{[ Style.tabs ]}>
+          %{tab_button "email" "Email"}
+          %{tab_button "anonymous" "Anonymous"}
+        </div>
+        %{if String.equal tab "email" then email_pane else anon_pane}
+      </div>
+    </div>
+  |}
 ;;
 
 (* ============================ LobbySelect ============================ *)
