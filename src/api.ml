@@ -26,11 +26,7 @@ let post
             ; "X-Avalon-Auth", Ffi.of_string id_token
             ]
         in
-        let body =
-          Js.Unsafe.fun_call
-            (Js.Unsafe.js_expr "JSON.stringify")
-            [| Ffi.inject (Ffi.obj data) |]
-        in
+        let body = Js._JSON##stringify (Ffi.obj data) in
         let opts =
           Ffi.obj
             [ "method", Ffi.of_string "POST"
@@ -38,20 +34,16 @@ let post
             ; "body", Ffi.inject body
             ]
         in
-        let fetch_p =
-          Js.Unsafe.fun_call
-            (Js.Unsafe.js_expr "fetch")
-            [| Ffi.of_string url; Ffi.inject opts |]
-        in
-        Ffi.promise_then
-          fetch_p
+        Ffi.fetch
+          url
+          ~opts
           ~on_err:(fun _ -> on_err "Network error")
           ~on_ok:(fun resp ->
             let ok = Ffi.to_bool (Ffi.get resp "ok") in
             Ffi.promise_then
               (Js.Unsafe.meth_call resp "json" [||])
               ~on_err:(fun _ ->
-                if ok then on_ok (Js.Unsafe.js_expr "({})") else on_err "Request failed")
+                if ok then on_ok (Ffi.obj []) else on_err "Request failed")
               ~on_ok:(fun json ->
                 if ok
                 then on_ok json

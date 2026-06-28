@@ -488,23 +488,14 @@ let sign_in_anonymously ?(on_err = noop_err) () =
   Firebase.sign_in_anonymously ~on_err:(fun e -> on_err (Firebase.error_message e))
 ;;
 
-let email_regex_ok email =
-  let f =
-    Js.Unsafe.js_expr "(function(e){return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e);})"
-  in
-  Js.to_bool (Js.Unsafe.fun_call f [| Ffi.of_string email |])
-;;
+let email_regexp = Regexp.regexp "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+let email_regex_ok email = Option.is_some (Regexp.string_match email_regexp email 0)
 
 let whitelist = [ "gmail.com"; "yahoo.com"; "outlook.com"; "hotmail.com"; "live.com" ]
 
 let send_sign_in_link ~email ~on_ok ~on_err =
   let hostname = Ffi.window_origin () ^ "/" in
-  let url =
-    Js.to_string
-      (Js.Unsafe.fun_call
-         (Js.Unsafe.js_expr "encodeURI")
-         [| Ffi.of_string (hostname ^ "?confirmEmail=" ^ email) |])
-  in
+  let url = Js.to_string (Js.encodeURI (Js.string (hostname ^ "?confirmEmail=" ^ email))) in
   let settings = { Firebase.url; handle_code_in_app = true } in
   Firebase.send_sign_in_link_to_email
     ~email
@@ -526,13 +517,8 @@ let submit_email_addr ?(on_ok = noop_ok) ?(on_err = noop_err) email =
     if List.mem whitelist domain ~equal:String.equal
     then proceed ()
     else (
-      let p =
-        Js.Unsafe.fun_call
-          (Js.Unsafe.js_expr "fetch")
-          [| Ffi.of_string ("https://api.mailcheck.ai/domain/" ^ domain) |]
-      in
-      Ffi.promise_then
-        p
+      Ffi.fetch
+        ("https://api.mailcheck.ai/domain/" ^ domain)
         ~on_err:(fun _ -> on_err "Cannot verify email. Try again later")
         ~on_ok:(fun resp ->
           Ffi.promise_then

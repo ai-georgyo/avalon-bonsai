@@ -36,9 +36,7 @@ let to_list (v : any) : any list =
 let keys (obj : any) : string list =
   if is_nullish obj
   then []
-  else (
-    let arr = Js.Unsafe.fun_call (Js.Unsafe.js_expr "Object.keys") [| inject obj |] in
-    List.map (to_list arr) ~f:to_string)
+  else List.map (Array.to_list (Js.to_array (Js.object_keys (Js.Unsafe.coerce obj)))) ~f:Js.to_string
 ;;
 
 let field_string ?(default = "") obj key =
@@ -87,44 +85,34 @@ let promise_then (p : any) ~(on_ok : any -> unit) ~(on_err : any -> unit) : unit
   ()
 ;;
 
-(* ---- window / location ---- *)
-
-let window_origin () : string = to_string (Js.Unsafe.js_expr "window.location.origin")
-let window_search () : string = to_string (Js.Unsafe.js_expr "window.location.search")
-let window_href () : string = to_string (Js.Unsafe.js_expr "window.location.href")
-let window_pathname () : string = to_string (Js.Unsafe.js_expr "window.location.pathname")
-
-let set_document_title (title : string) : unit =
-  Js.Unsafe.set (Js.Unsafe.js_expr "document") (str "title") (str title)
+(* The Fetch API has no typed binding in js_of_ocaml, so confine the one raw [fetch] call
+   here. [on_ok] receives the (untyped) Response. *)
+let fetch ?opts (url : string) ~(on_ok : any -> unit) ~(on_err : any -> unit) : unit =
+  let args =
+    match opts with
+    | Some (o : any) -> [| inject (str url); inject o |]
+    | None -> [| inject (str url) |]
+  in
+  promise_then (Js.Unsafe.fun_call (Js.Unsafe.js_expr "fetch") args) ~on_ok ~on_err
 ;;
+
+(* ---- window / location / url (typed js_of_ocaml DOM bindings) ---- *)
+
+let window = Dom_html.window
+let location = window##.location
+
+let window_origin () : string = Js.to_string location##.origin
+let window_href () : string = Js.to_string location##.href
+let window_pathname () : string = Js.to_string location##.pathname
+let set_document_title (title : string) : unit = window##.document##.title := str title
 
 let replace_state_to_pathname () : unit =
-  let _ : any =
-    Js.Unsafe.fun_call
-      (Js.Unsafe.js_expr
-         "(function(p){window.history.replaceState(null,'',p);})")
-      [| inject (str (window_pathname ())) |]
-  in
-  ()
+  window##.history##replaceState Js.null (str "") (Js.some (str (window_pathname ())))
 ;;
 
-let alert (msg : string) : unit =
-  let _ : any = Js.Unsafe.fun_call (Js.Unsafe.js_expr "window.alert") [| inject (str msg) |] in
-  ()
-;;
+let alert (msg : string) : unit = window##alert (str msg)
 
-let url_has_param (name : string) : bool =
-  let f =
-    Js.Unsafe.js_expr
-      "(function(s,n){return new URLSearchParams(s).has(n);})"
-  in
-  Js.to_bool (Js.Unsafe.fun_call f [| inject (str (window_search ())); inject (str name) |])
-;;
-
-let url_get_param (name : string) : string option =
-  let f =
-    Js.Unsafe.js_expr "(function(s,n){return new URLSearchParams(s).get(n);})"
-  in
-  let v = Js.Unsafe.fun_call f [| inject (str (window_search ())); inject (str name) |] in
-  if is_nullish v then None else Some (to_string v)
-;;
+(* GET arguments of the current URL, decoded — [Url.Current.arguments] replaces a manual
+   URLSearchParams construction. *)
+let url_has_param (name : string) : bool = List.Assoc.mem Url.Current.arguments name ~equal:String.equal
+let url_get_param (name : string) : string option = List.Assoc.find Url.Current.arguments name ~equal:String.equal

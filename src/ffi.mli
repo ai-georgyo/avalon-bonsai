@@ -30,8 +30,11 @@ val of_bool : bool -> any
 val of_int : int -> any
 val of_str_list : string list -> any
 
-(* promises *)
+(* promises / fetch *)
 val promise_then : any -> on_ok:(any -> unit) -> on_err:(any -> unit) -> unit
+
+(** [fetch ?opts url] — the single raw Fetch-API call site; [on_ok] receives the Response. *)
+val fetch : ?opts:any -> string -> on_ok:(any -> unit) -> on_err:(any -> unit) -> unit
 
 (* window / location *)
 val window_origin : unit -> string
