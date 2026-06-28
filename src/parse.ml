@@ -1,4 +1,5 @@
 open! Core
+open Avalon_core
 open Types
 
 (** Parsers from raw Firestore JS objects ([Ffi.any]) into the OCaml domain model. *)

@@ -1,0 +1,5 @@
+(library
+ (name avalon_core)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane)))

@@ -1,6 +1,7 @@
 open! Core
 open Js_of_ocaml
 open Bonsai_web
+open Avalon_core
 open Types
 
 (** The reactive store. [Model.t] is an immutable snapshot held in a {!Bonsai.Var};

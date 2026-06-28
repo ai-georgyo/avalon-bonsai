@@ -1,6 +1,7 @@
 open! Core
 open Bonsai_web
 open Bonsai.Let_syntax
+open Avalon_core
 open Types
 module M = State.Model
 module D = State.Derived
