@@ -72,7 +72,7 @@ val get_doc : document_reference -> on_ok:(document_snapshot -> unit) -> on_err:
 (* ---- document snapshot ---- *)
 val exists : document_snapshot -> bool
 
-(** The document's data as a raw JS object (for {!Avalon.Parse}), or [None] if it doesn't exist. *)
+(** The document's data as a raw JS object (for the avalon [Parse] module), or [None] if it doesn't exist. *)
 val data : document_snapshot -> Js.Unsafe.any option
 
 (* ---- error ---- *)

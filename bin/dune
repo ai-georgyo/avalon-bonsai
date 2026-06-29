@@ -1,6 +1,6 @@
 (executable
  (name main)
- (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon)
+ (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon_components)
  (flags
   (:standard -w +70 -warn-error +70))
  (preprocess

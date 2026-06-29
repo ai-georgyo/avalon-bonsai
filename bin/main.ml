@@ -1,1 +1,1 @@
-let () = Avalon.View.run_app ()
+let () = Avalon_components.View.run_app ()
