@@ -1,0 +1,62 @@
+open! Core
+open Bonsai_web
+open Bonsai.Let_syntax
+open Avalon_core
+open Types
+open Ui
+module D = State.Derived
+module N = Vdom.Node
+module A = Vdom.Attr
+
+(** Role lists: the admin-selectable list in the lobby, and the static read-only list shown
+    on the in-game participants tab. Uses only the shared {!Ui} styling. *)
+
+let selectable_role_list (local_ graph) =
+  let info, set_info = Bonsai.state_opt graph ~sexp_of_model:[%sexp_of: role] in
+  let%arr m = State.value () and info = info and set_info = set_info in
+  let allow = D.is_admin m in
+  let selected = m.selected_roles in
+  let item (role : role) =
+    let is_sel = Set.mem selected role.name in
+    let checkbox =
+      if allow
+      then
+        N.input
+          ~attrs:[ A.type_ "checkbox"; A.checked_prop is_sel; A.on_click (fun _ -> eff (fun () -> State.toggle_role ~name:role.name ~selected:(not is_sel))) ]
+          ()
+      else N.none
+    in
+    let info_btn = btn ~attrs:[ Ui.icon_btn ] ~on_click:(set_info (Some role)) [ mdi "information" ] in
+    {%html.jsx|
+      <li class="v-list-item">
+        <div *{[ Ui.li_prepend ]}>%{checkbox}%{team_icon role.team}</div>
+        <div *{[ Ui.li_title ]}>#{role.name}</div>
+        %{info_btn}
+      </li>
+    |}
+  in
+  let dialog =
+    match info with
+    | None -> N.none
+    | Some role ->
+      overlay ~on_close:(set_info None)
+        [ card_title ~attrs:[ Ui.title_bar ] [ team_icon role.team; N.h3 [ N.text role.name ] ]; card_text [ N.text role.description ] ]
+  in
+  let items = List.map Avalonlib.selectable_roles ~f:item in
+  {%html.jsx|<div><ul class="v-list">*{items}</ul>%{dialog}</div>|}
+;;
+
+(* static role display (in-game participants tab) *)
+let role_list_view (roles : role list) =
+  let item (role : role) =
+    let attrs = [ A.class_ "v-list-item"; A.create "title" role.description ] in
+    {%html.jsx|
+      <li *{attrs}>
+        <div *{[ Ui.li_prepend ]}>%{team_icon role.team}</div>
+        <div *{[ Ui.li_title ]}>#{role.name}</div>
+      </li>
+    |}
+  in
+  let items = List.map roles ~f:item in
+  {%html.jsx|<ul class="v-list">*{items}</ul>|}
+;;

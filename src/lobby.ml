@@ -1,0 +1,179 @@
+open! Core
+open Bonsai_web
+open Bonsai.Let_syntax
+open Avalon_core
+open Types
+open Ui
+module D = State.Derived
+module N = Vdom.Node
+module A = Vdom.Attr
+
+(** The lobby screens: choosing/creating a lobby, and the pre-game lobby (player list,
+    selectable roles, start controls). *)
+
+module Style =
+  [%css
+  stylesheet
+    {|
+  .lobby_select { display: flex; justify-content: center; padding: 16px; }
+  .lobby_inner { width: 100%; max-width: 440px; }
+  .lobby_buttons { width: 100%; }
+  .lobby_buttons .btn { width: 100%; }
+  .checkbox_row { display: flex; align-items: center; gap: 6px; color: #e0f7fa; padding-top: 16px; }
+|}]
+
+(* ---- LobbySelect ---- *)
+let lobby_select (local_ graph) =
+  let name_default = Option.value_map (State.model ()).user ~default:"" ~f:(fun u -> u.name) in
+  let name, set_name = Bonsai.state name_default graph in
+  let lobby, set_lobby = Bonsai.state "" graph in
+  let error, set_error = Bonsai.state "" graph in
+  let show_lobby_input, set_show_lobby_input = Bonsai.state false graph in
+  let creating, set_creating = Bonsai.state false graph in
+  let joining, set_joining = Bonsai.state false graph in
+  let%arr m = State.value ()
+  and name = name and set_name = set_name
+  and lobby = lobby and set_lobby = set_lobby
+  and error = error and set_error = set_error
+  and show_lobby_input = show_lobby_input and set_show_lobby_input = set_show_lobby_input
+  and creating = creating and set_creating = set_creating
+  and joining = joining and set_joining = set_joining in
+  let do_create =
+    eff (fun () ->
+      run (set_creating true);
+      State.create_lobby ~name ~on_ok:(fun () -> run (set_creating false)) ~on_err:(fun e -> run (set_error e); run (set_creating false)) ())
+  in
+  let do_join =
+    eff (fun () ->
+      run (set_joining true);
+      State.join_lobby ~name ~lobby ~on_ok:(fun () -> run (set_joining false)) ~on_err:(fun e -> run (set_error e); run (set_joining false)) ())
+  in
+  let form =
+    if not show_lobby_input
+    then
+      [ text_field ~attrs:[ Ui.upper ] ~placeholder:"Your Name" ~value:name ~on_input:(fun s -> set_name (String.uppercase s)) ()
+      ; error_text error
+      ; div ~attrs:[ Ui.col; Ui.ga_2; Style.lobby_buttons ]
+          [ btn ~disabled:(String.is_empty name) ~loading:creating ~on_click:do_create [ N.text "Create Lobby" ]
+          ; btn ~disabled:(String.is_empty name || creating) ~on_click:(set_show_lobby_input true) [ N.text "Join Lobby" ]
+          ]
+      ]
+    else
+      [ text_field ~attrs:[ Ui.upper ] ~placeholder:"Lobby" ~value:lobby ~on_input:(fun s -> set_lobby (String.uppercase s)) ~extra:[ on_enter do_join ] ()
+      ; error_text error
+      ; div ~attrs:[ Ui.col; Ui.ga_2; Style.lobby_buttons ]
+          [ btn ~disabled:(String.is_empty lobby) ~loading:joining ~on_click:do_join [ N.text "Join Lobby" ]
+          ; btn ~disabled:joining ~on_click:(set_show_lobby_input false) [ N.text "Cancel" ]
+          ]
+      ]
+  in
+  let children = form @ [ div ~attrs:[ Ui.pt_8 ] []; Stats.stats_display (Option.bind m.user ~f:(fun u -> u.stats)) m.global_stats ] in
+  {%html.jsx|
+    <div *{[ Style.lobby_select ]}>
+      <div *{[ Ui.col; Ui.center; Style.lobby_inner ]}>*{children}</div>
+    </div>
+  |}
+;;
+
+(* ---- LobbyPlayerList (private) ---- *)
+let lobby_player_list (local_ graph) =
+  let kick_target, set_kick_target = Bonsai.state_opt graph ~sexp_of_model:[%sexp_of: string] in
+  let%arr m = State.value () and kick_target = kick_target and set_kick_target = set_kick_target in
+  let can_reorder = D.is_admin m && not (D.is_game_in_progress m) in
+  let admin_name = Option.value_map (D.admin m) ~default:"" ~f:(fun a -> a.name) in
+  let me = D.user_name m in
+  let n = List.length m.player_list in
+  let item idx player =
+    let prepend_icon =
+      if String.equal player admin_name then mdi "star"
+      else if String.equal player me then mdi "account"
+      else mdi "account-outline"
+    in
+    let reorder =
+      if can_reorder
+      then
+        [ btn ~attrs:[ Ui.icon_btn ] ~disabled:(idx = 0) ~on_click:(eff (fun () -> State.set_player_list (swap_at m.player_list (idx - 1)))) [ mdi "chevron-up" ]
+        ; btn ~attrs:[ Ui.icon_btn ] ~disabled:(idx = n - 1) ~on_click:(eff (fun () -> State.set_player_list (swap_at m.player_list idx))) [ mdi "chevron-down" ]
+        ]
+      else []
+    in
+    let kick_btn =
+      if D.is_admin m && (not (String.equal player me)) && not (D.is_game_in_progress m)
+      then [ btn ~attrs:[ Ui.icon_btn ] ~on_click:(set_kick_target (Some player)) [ mdi "close" ] ]
+      else []
+    in
+    let prepend = div ~attrs:[ Ui.li_prepend ] (reorder @ [ prepend_icon ]) in
+    {%html.jsx|
+      <li class="v-list-item">
+        %{prepend}
+        <div *{[ Ui.li_title ]}>#{player}</div>
+        *{kick_btn}
+      </li>
+    |}
+  in
+  let items = List.mapi m.player_list ~f:item in
+  let dialog =
+    match kick_target with
+    | None -> N.none
+    | Some player ->
+      overlay ~on_close:(set_kick_target None)
+        [ card_title ~attrs:[ Ui.title_bar ] [ N.h3 [ textf "Kick %s?" player ] ]
+        ; card_text [ textf "Do you wish to kick %s from the lobby?" player ]
+        ; div ~attrs:[ Ui.row; Ui.actions ]
+            [ btn ~on_click:(eff (fun () -> run (set_kick_target None); State.kick_player player)) [ textf "Kick %s" player ]; btn ~on_click:(set_kick_target None) [ N.text "Cancel" ] ]
+        ]
+  in
+  {%html.jsx|<div><ul class="v-list">*{items}</ul>%{dialog}</div>|}
+;;
+
+(* ---- GameLobby ---- *)
+let game_lobby (local_ graph) =
+  let starting, set_starting = Bonsai.state false graph in
+  let in_game_log, set_in_game_log = Bonsai.state false graph in
+  let players = lobby_player_list graph in
+  let roles = Role_list.selectable_role_list graph in
+  let%arr m = State.value ()
+  and starting = starting and set_starting = set_starting
+  and in_game_log = in_game_log and set_in_game_log = set_in_game_log
+  and players = players and roles = roles in
+  let num_players = List.length m.player_list in
+  let valid_team_size = num_players >= 5 && num_players <= 10 in
+  let num_evil = Option.value (Avalonlib.get_num_evil_for_game_size num_players) ~default:0 in
+  let lobby_name = Option.value_map m.lobby ~default:"" ~f:(fun l -> l.name) in
+  let reason_not_start =
+    if num_players < 5 then Some (sprintf "Need at least 5 players! Invite your friends to lobby %s" lobby_name)
+    else if num_players > 10 then Some "Cannot start game with more than 10 players"
+    else if not (D.is_admin m) then Some (sprintf "Waiting for %s to start game..." (Option.value_map (D.admin m) ~default:"" ~f:(fun a -> a.name)))
+    else None
+  in
+  let start = eff (fun () -> run (set_starting true); State.start_game ~in_game_log ~on_ok:(fun () -> run (set_starting false)) ~on_err:(fun _ -> run (set_starting false)) ()) in
+  let seating_hint = if D.is_admin m && num_players > 2 then {%html.jsx|<p *{[ Ui.caption ]}>Use the arrows to set seating order</p>|} else N.none in
+  let roles_col = if valid_team_size then {%html.jsx|<div *{[ Ui.col6 ]}><p *{[ Ui.label ]}>Special Roles Available</p>%{roles}</div>|} else N.none in
+  let counts =
+    if valid_team_size
+    then {%html.jsx|<div *{[ Ui.row; Ui.center ]}><p *{[ Ui.text_h6; Ui.label ]}>%{textf "%d players: %d good, %d evil" num_players (num_players - num_evil) num_evil}</p></div>|}
+    else N.none
+  in
+  let start_area =
+    match reason_not_start with
+    | None -> btn ~loading:starting ~on_click:start [ mdi "play"; N.text "Start Game" ]
+    | Some reason -> card ~attrs:[ Ui.info_card ] [ card_text ~attrs:[ Ui.center ] [ N.text reason ] ]
+  in
+  let log_attrs = [ A.type_ "checkbox"; A.checked_prop in_game_log; A.on_click (fun _ -> set_in_game_log (not in_game_log)) ] in
+  {%html.jsx|
+    <div *{[ Ui.container ]}>
+      <div *{[ Ui.row; Ui.wrap; Ui.start ]}>
+        <div *{[ Ui.col6 ]}>
+          <p *{[ Ui.label ]}>Players</p>
+          %{players}
+          %{seating_hint}
+        </div>
+        %{roles_col}
+      </div>
+      %{counts}
+      <div *{[ Ui.row; Ui.center; Ui.pt_2 ]}>%{start_area}</div>
+      <label *{[ Style.checkbox_row ]}><input *{log_attrs} />#{" In-game log"}</label>
+      <div *{[ Ui.col; Ui.pt_6 ]}>%{feedback_link "Send feedback"}</div>
+    </div>
+  |}
+;;
