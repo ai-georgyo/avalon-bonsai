@@ -23,3 +23,60 @@ let%test_unit "badges for a clean good win" =
          ; "- Ghost: DAVE was evil but never went on a single mission"
          ])
 ;;
+
+let badge_lines t = lines (List.map (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) -> sprintf "- %s: %s" b.title b.body))
+
+let find_body t title =
+  match List.find (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) -> String.equal b.title title) with
+  | Some b -> b.body
+  | None -> "<absent>"
+;;
+
+(* Guards the psychic_powers tie-break: ALICE and BOB both have two perfect proposals; the
+   badge must name the earliest-seated (ALICE), not whichever a hashtable happens to yield. *)
+let%test_unit "Actual Merlin tie-break is deterministic (earliest seat)" =
+  let t = Analysis.create Fixtures.psychic_tie ~role_map:Fixtures.role_map in
+  [%test_result: string] (find_body t "Actual Merlin") ~expect:"ALICE proposed 2 perfect teams and no bad teams"
+;;
+
+(* Guards the proposer_curse tie-break: ALICE and BOB each have three rejected proposals;
+   the badge must name the one rejected first (ALICE), matching JS object-insertion order. *)
+let%test_unit "Cursed proposer tie-break is deterministic (first rejected)" =
+  let mission0 =
+    { (List.hd_exn Fixtures.good_win.missions) with
+      proposals =
+        [ Fixtures.rejected "ALICE" [ "ALICE"; "BOB" ]; Fixtures.rejected "BOB" [ "BOB"; "CARL" ]
+        ; Fixtures.rejected "ALICE" [ "ALICE"; "CARL" ]; Fixtures.rejected "BOB" [ "ALICE"; "BOB" ]
+        ; Fixtures.rejected "ALICE" [ "BOB"; "CARL" ]; Fixtures.rejected "BOB" [ "ALICE"; "CARL" ]
+        ; Fixtures.approved "ALICE" [ "ALICE"; "BOB" ]
+        ]
+    }
+  in
+  let data = { Fixtures.good_win with missions = mission0 :: List.tl_exn Fixtures.good_win.missions } in
+  let t = Analysis.create data ~role_map:Fixtures.role_map in
+  [%test_result: string] (find_body t "Cursed proposer") ~expect:"ALICE had 3 proposals rejected"
+;;
+
+(* Locks in the badge set for an evil win by assassination — exercises the assassination,
+   evil-side, and rejection detectors the good-win fixture never reaches. *)
+let%test_unit "badges for an evil win by assassination" =
+  let t = Analysis.create Fixtures.evil_win ~role_map:Fixtures.role_map in
+  [%test_result: string]
+    (badge_lines t)
+    ~expect:
+      (lines
+         [ "- Look, ma, no hands: Evil team won despite not failing any missions"
+         ; "- I trust you guys: CARL proposed a team that did not include themselves"
+         ; "- What a trusting bunch: First mission got approved within 2 tries"
+         ; "- Playing the long con: DAVE stayed undercover instead of failing mission 2"
+         ; "- Biding my time: DAVE was evil, but only went on successful missions"
+         ; "- Put me in, coach!: EVE did not go on a single mission"
+         ; "- Cover blown: Morgana approved a team with Merlin"
+         ; "- Good luck, Percival: Merlin approved a team with Morgana"
+         ; "- Got you fooled: Percival both proposed and approved teams with Morgana"
+         ; "- Hard pass: DAVE's proposal on mission 1 was rejected by everyone"
+         ; "- Ghost: EVE was evil but never went on a single mission"
+         ; "- Dodged a bullet: Mission 2 succeeded despite DAVE being on the team"
+         ; "- Bullseye: The assassin correctly identified and killed Merlin"
+         ])
+;;

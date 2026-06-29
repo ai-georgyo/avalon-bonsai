@@ -496,10 +496,12 @@ let psychic_powers t =
         if evil_count < me.m.fails_required
         then ps.good_proposals <- ps.good_proposals + 1
         else ps.bad_proposals <- ps.bad_proposals + 1));
+  (* Match the JS: iterate in player (seat) order and use a stable sort, so ties resolve to
+     the earliest-seated player as Object.values(keyBy(...)).sort() does. *)
   let perfect =
-    Hashtbl.data players
+    List.filter_map t.game.players ~f:(Hashtbl.find players)
     |> List.filter ~f:(fun p -> p.bad_proposals = 0 && p.good_proposals >= 2)
-    |> List.sort ~compare:(fun a b -> Int.compare b.good_proposals a.good_proposals)
+    |> List.stable_sort ~compare:(fun a b -> Int.compare b.good_proposals a.good_proposals)
   in
   match perfect with
   | top :: _ ->
@@ -733,12 +735,19 @@ let big_team_betrayal t =
 
 let proposer_curse t =
   let counts = String.Table.create () in
+  (* Preserve first-rejection encounter order (JS object insertion order) so a stable sort
+     resolves ties to the proposer who was rejected first, matching Object.entries(...). *)
+  let order = Queue.create () in
   List.iter t.missions ~f:(fun me ->
     List.iter me.m.proposals ~f:(fun p ->
       if equal_proposal_state p.state Rejected
-      then Hashtbl.update counts p.proposer ~f:(function None -> 1 | Some n -> n + 1)));
+      then (
+        if not (Hashtbl.mem counts p.proposer) then Queue.enqueue order p.proposer;
+        Hashtbl.update counts p.proposer ~f:(function None -> 1 | Some n -> n + 1))));
   let sorted =
-    Hashtbl.to_alist counts |> List.sort ~compare:(fun (_, a) (_, b) -> Int.compare b a)
+    Queue.to_list order
+    |> List.map ~f:(fun player -> player, Hashtbl.find_exn counts player)
+    |> List.stable_sort ~compare:(fun (_, a) (_, b) -> Int.compare b a)
   in
   match sorted with
   | (player, count) :: _ when count >= 3 ->
