@@ -32,7 +32,17 @@ val fa : ?color:string -> string -> string -> Vdom.Node.t
 val mdi : string -> Vdom.Node.t
 val team_icon : team -> Vdom.Node.t
 val fa_layers : ?attrs:Vdom.Attr.t list -> Vdom.Node.t list -> Vdom.Node.t
-val overlay : ?fullscreen:bool -> on_close:unit Effect.t -> Vdom.Node.t list -> Vdom.Node.t
+(** A centered, dimmed, focus-trapped, Esc/click-outside-closable modal (toplayer), shown
+    while [value] is [Some]. Portaled into the browser's top layer, so it returns [unit]
+    rather than a node to splice into the tree; closing runs [on_close] (which typically
+    clears the same [value] option). [content] receives the [Some] payload and a [~close]
+    effect for its own buttons. *)
+val modal
+  :  'a option Bonsai.t
+  -> on_close:unit Effect.t Bonsai.t
+  -> content:('a -> close:unit Effect.t -> Vdom.Node.t)
+  -> local_ Bonsai.graph
+  -> unit
 
 val text_field
   :  ?attrs:Vdom.Attr.t list
@@ -45,6 +55,11 @@ val text_field
   -> Vdom.Node.t
 
 val error_text : string -> Vdom.Node.t
+
+(** A styled, touch-capable hover tooltip attribute (toplayer), for use in place of a bare
+    [title=] attribute. *)
+val tooltip_text : string -> Vdom.Attr.t
+
 val feedback_link : string -> Vdom.Node.t
 
 (* ---- shared style-class accessors ---- *)
@@ -91,5 +106,7 @@ val li_title : Vdom.Attr.t
 val li_append : Vdom.Attr.t
 val field_error : Vdom.Attr.t
 val welcome : Vdom.Attr.t
+val overlay_card : Vdom.Attr.t
+val modal_box : Vdom.Attr.t
 val layers_text : Vdom.Attr.t
 val spinner_lg : Vdom.Attr.t

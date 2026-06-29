@@ -70,24 +70,32 @@ let view_role_button (local_ graph) =
 ;;
 
 (* ---- QuitButton (private) ---- *)
+(* Spike: this dialog uses a toplayer [Modal] instead of the hand-rolled [Ui.overlay], so it
+   gets focus-trapping, Esc-to-close, an inert background, and body-scroll lock for free. The
+   modal is portaled into the top layer (it returns only [Controls], not a node), and its open
+   state lives in toplayer rather than a local [Bonsai.state]. *)
 let quit_button (local_ graph) =
-  let dialog, set_dialog = Bonsai.state false graph in
-  let%arr m = State.value () and dialog = dialog and set_dialog = set_dialog in
-  let in_game = D.is_game_in_progress m in
-  let action_desc = if in_game then "Cancel Game" else "Leave Lobby" in
-  let confirm = eff (fun () -> run (set_dialog false); if in_game then State.cancel_game () else State.leave_lobby ()) in
-  let activator = btn ~on_click:(set_dialog true) [ mdi "exit-to-app"; spanc ~attrs:[ Style.quit_text ] [ N.text "Quit" ] ] in
-  let dialog_node =
-    if not dialog
-    then N.none
-    else
-      overlay ~on_close:(set_dialog false)
-        [ card_title ~attrs:[ Ui.title_bar ] [ N.h3 [ textf "%s?" action_desc ] ]
-        ; card_text [ N.text ((if in_game then "The current game will be canceled! " else "") ^ "Are you sure you want to proceed?") ]
-        ; div ~attrs:[ Ui.row; Ui.actions ] [ btn ~on_click:confirm [ N.text action_desc ]; btn ~on_click:(set_dialog false) [ N.text "Nevermind" ] ]
-        ]
+  let controls =
+    Bonsai_web_toplayer.Modal.create
+      ~attrs:(Bonsai.return [ Ui.modal_box ])
+      ~close_on_esc:(Bonsai.return true)
+      ~lock_body_scroll:(Bonsai.return true)
+      ~content:(fun ~close graph ->
+        let%arr m = State.value () and close = close in
+        let in_game = D.is_game_in_progress m in
+        let action_desc = if in_game then "Cancel Game" else "Leave Lobby" in
+        let confirm = Effect.Many [ eff (fun () -> if in_game then State.cancel_game () else State.leave_lobby ()); close ] in
+        div
+          ~attrs:[ Ui.overlay_card ]
+          [ card_title ~attrs:[ Ui.title_bar ] [ N.h3 [ textf "%s?" action_desc ] ]
+          ; card_text [ N.text ((if in_game then "The current game will be canceled! " else "") ^ "Are you sure you want to proceed?") ]
+          ; div ~attrs:[ Ui.row; Ui.actions ] [ btn ~on_click:confirm [ N.text action_desc ]; btn ~on_click:close [ N.text "Nevermind" ] ]
+          ])
+      graph
   in
-  {%html.jsx|<div>%{activator}%{dialog_node}</div>|}
+  let%arr open_ = controls.open_ in
+  let activator = btn ~on_click:open_ [ mdi "exit-to-app"; spanc ~attrs:[ Style.quit_text ] [ N.text "Quit" ] ] in
+  {%html.jsx|<div>%{activator}</div>|}
 ;;
 
 (* ---- GameToolbar ---- *)

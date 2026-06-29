@@ -13,7 +13,15 @@ module A = Vdom.Attr
 
 let selectable_role_list (local_ graph) =
   let info, set_info = Bonsai.state_opt graph ~sexp_of_model:[%sexp_of: role] in
-  let%arr m = State.value () and info = info and set_info = set_info in
+  Ui.modal
+    info
+    ~on_close:(let%arr set_info = set_info in set_info None)
+    ~content:(fun (role : role) ~close:_ ->
+      div
+        ~attrs:[ Ui.overlay_card ]
+        [ card_title ~attrs:[ Ui.title_bar ] [ team_icon role.team; N.h3 [ N.text role.name ] ]; card_text [ N.text role.description ] ])
+    graph;
+  let%arr m = State.value () and set_info = set_info in
   let allow = D.is_admin m in
   let selected = m.selected_roles in
   let item (role : role) =
@@ -35,15 +43,8 @@ let selectable_role_list (local_ graph) =
       </li>
     |}
   in
-  let dialog =
-    match info with
-    | None -> N.none
-    | Some role ->
-      overlay ~on_close:(set_info None)
-        [ card_title ~attrs:[ Ui.title_bar ] [ team_icon role.team; N.h3 [ N.text role.name ] ]; card_text [ N.text role.description ] ]
-  in
   let items = List.map Avalonlib.selectable_roles ~f:item in
-  {%html.jsx|<div><ul class="v-list">*{items}</ul>%{dialog}</div>|}
+  {%html.jsx|<div><ul class="v-list">*{items}</ul></div>|}
 ;;
 
 (* static role display (in-game participants tab) *)

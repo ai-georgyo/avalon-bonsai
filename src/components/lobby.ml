@@ -7,6 +7,7 @@ open Ui
 module D = State.Derived
 module N = Vdom.Node
 module A = Vdom.Attr
+module Dnd = Bonsai_web_drag_and_drop
 
 (** The lobby screens: choosing/creating a lobby, and the pre-game lobby (player list,
     selectable roles, start controls). *)
@@ -20,7 +21,18 @@ module Style =
   .lobby_buttons { width: 100%; }
   .lobby_buttons .btn { width: 100%; }
   .checkbox_row { display: flex; align-items: center; gap: 6px; color: #e0f7fa; padding-top: 16px; }
+  /* drag-to-reorder (toplayer/drag_and_drop) affordances */
+  .drag_handle { cursor: grab; color: rgba(0,0,0,0.4); display: flex; align-items: center; }
+  .drag_handle:active { cursor: grabbing; }
+  .drag_ghost { background: #cfd8dc; border-radius: 4px; padding: 4px 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); font-weight: 600; opacity: 0.95; }
 |}]
+
+(* Move [name] to sit at [target_idx] in the player order (used by drag-and-drop on_drop). *)
+let reorder_to list ~name ~target_idx =
+  let without = List.filter list ~f:(fun p -> not (String.equal p name)) in
+  let idx = Int.max 0 (Int.min target_idx (List.length without)) in
+  List.take without idx @ [ name ] @ List.drop without idx
+;;
 
 (* ---- LobbySelect ---- *)
 let lobby_select (local_ graph) =
@@ -78,7 +90,38 @@ let lobby_select (local_ graph) =
 (* ---- LobbyPlayerList (private) ---- *)
 let lobby_player_list (local_ graph) =
   let kick_target, set_kick_target = Bonsai.state_opt graph ~sexp_of_model:[%sexp_of: string] in
-  let%arr m = State.value () and kick_target = kick_target and set_kick_target = set_kick_target in
+  (* A drag-and-drop "universe": dragging a player's handle (source = player name) onto a
+     row (drop target = that row's index) reorders the seating. The on_click ▲▼ arrows are
+     kept as an accessible fallback. *)
+  let dnd =
+    Dnd.create
+      ~source_id:(module String)
+      ~target_id:(module Int)
+      ~on_drop:
+        (Bonsai.return (fun name target_idx ->
+           eff (fun () -> State.set_player_list (reorder_to (State.model ()).player_list ~name ~target_idx))))
+      graph
+  in
+  let ghost =
+    Dnd.dragged_element dnd graph ~f:(fun name _graph ->
+      let%arr name = name in
+      {%html.jsx|<div *{[ Style.drag_ghost ]}>#{name}</div>|})
+  in
+  Ui.modal
+    kick_target
+    ~on_close:(let%arr set_kick_target = set_kick_target in set_kick_target None)
+    ~content:(fun player ~close ->
+      div
+        ~attrs:[ Ui.overlay_card ]
+        [ card_title ~attrs:[ Ui.title_bar ] [ N.h3 [ textf "Kick %s?" player ] ]
+        ; card_text [ textf "Do you wish to kick %s from the lobby?" player ]
+        ; div ~attrs:[ Ui.row; Ui.actions ]
+            [ btn ~on_click:(Effect.Many [ eff (fun () -> State.kick_player player); close ]) [ textf "Kick %s" player ]
+            ; btn ~on_click:close [ N.text "Cancel" ]
+            ]
+        ])
+    graph;
+  let%arr m = State.value () and set_kick_target = set_kick_target and dnd = dnd and ghost = ghost in
   let can_reorder = D.is_admin m && not (D.is_game_in_progress m) in
   let admin_name = Option.value_map (D.admin m) ~default:"" ~f:(fun a -> a.name) in
   let me = D.user_name m in
@@ -92,7 +135,8 @@ let lobby_player_list (local_ graph) =
     let reorder =
       if can_reorder
       then
-        [ btn ~attrs:[ Ui.icon_btn ] ~disabled:(idx = 0) ~on_click:(eff (fun () -> State.set_player_list (swap_at m.player_list (idx - 1)))) [ mdi "chevron-up" ]
+        [ spanc ~attrs:[ Style.drag_handle; Dnd.source dnd ~id:player; Ui.tooltip_text "Drag to reorder seating" ] [ mdi "drag-horizontal-variant" ]
+        ; btn ~attrs:[ Ui.icon_btn ] ~disabled:(idx = 0) ~on_click:(eff (fun () -> State.set_player_list (swap_at m.player_list (idx - 1)))) [ mdi "chevron-up" ]
         ; btn ~attrs:[ Ui.icon_btn ] ~disabled:(idx = n - 1) ~on_click:(eff (fun () -> State.set_player_list (swap_at m.player_list idx))) [ mdi "chevron-down" ]
         ]
       else []
@@ -103,8 +147,9 @@ let lobby_player_list (local_ graph) =
       else []
     in
     let prepend = div ~attrs:[ Ui.li_prepend ] (reorder @ [ prepend_icon ]) in
+    let li_attrs = if can_reorder then [ Dnd.drop_target dnd ~id:idx ] else [] in
     {%html.jsx|
-      <li class="v-list-item">
+      <li class="v-list-item" *{li_attrs}>
         %{prepend}
         <div *{[ Ui.li_title ]}>#{player}</div>
         *{kick_btn}
@@ -112,18 +157,12 @@ let lobby_player_list (local_ graph) =
     |}
   in
   let items = List.mapi m.player_list ~f:item in
-  let dialog =
-    match kick_target with
-    | None -> N.none
-    | Some player ->
-      overlay ~on_close:(set_kick_target None)
-        [ card_title ~attrs:[ Ui.title_bar ] [ N.h3 [ textf "Kick %s?" player ] ]
-        ; card_text [ textf "Do you wish to kick %s from the lobby?" player ]
-        ; div ~attrs:[ Ui.row; Ui.actions ]
-            [ btn ~on_click:(eff (fun () -> run (set_kick_target None); State.kick_player player)) [ textf "Kick %s" player ]; btn ~on_click:(set_kick_target None) [ N.text "Cancel" ] ]
-        ]
-  in
-  {%html.jsx|<div><ul class="v-list">*{items}</ul>%{dialog}</div>|}
+  {%html.jsx|
+    <div *{[ Dnd.sentinel dnd ~name:"lobby-players" ]}>
+      <ul class="v-list">*{items}</ul>
+      %{ghost}
+    </div>
+  |}
 ;;
 
 (* ---- GameLobby ---- *)

@@ -1,6 +1,9 @@
 (library
  (name avalon_components)
- (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon_core avalon)
+ (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon_core avalon
+   bonsai_web_components.toplayer
+   bonsai_web_components.drag_and_drop
+   bonsai_web_components.reorderable_list)
  (flags
   (:standard -w +70 -warn-error +70))
  (preprocess

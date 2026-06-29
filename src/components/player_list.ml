@@ -80,7 +80,7 @@ let game_player_list ~selected ~set_selected (local_ graph) =
       in
       if List.is_empty icons
       then N.none
-      else fa_layers ~attrs:[ A.create "title" (sprintf "%s %s" name (Util.join_with_and states)) ] icons
+      else fa_layers ~attrs:[ Ui.tooltip_text (sprintf "%s %s" name (Util.join_with_and states)) ] icons
     in
     let item name =
       let checkbox =
@@ -92,7 +92,7 @@ let game_player_list ~selected ~set_selected (local_ graph) =
         if Option.value_map g.current_proposer ~default:false ~f:(String.equal name)
         then
           fa_layers
-            ~attrs:[ A.create "title" (sprintf "%s is proposing the next team" name) ]
+            ~attrs:[ Ui.tooltip_text (sprintf "%s is proposing the next team" name) ]
             [ fa ~color:crown_color "fas" "fa-crown"; spanc ~attrs:[ Ui.layers_text ] [ N.text (Int.to_string (g.current_proposal_idx + 1)) ] ]
         else if Option.value_map g.hammer ~default:false ~f:(String.equal name) then fa "fas" "fa-hammer"
         else N.none

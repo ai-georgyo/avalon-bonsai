@@ -18,8 +18,9 @@ let app (local_ graph) =
   let lobby = Lobby.game_lobby graph in
   let board = Game_board.game_board graph in
   let toolbar = Toolbar.game_toolbar graph in
-  let modals = Modals.modals graph in
-  let%arr m = State.value () and login = login and lobby_sel = lobby_sel and lobby = lobby and board = board and toolbar = toolbar and modals = modals in
+  (* registers the event modals (start/mission-result/end-game) into the top layer *)
+  Modals.modals graph;
+  let%arr m = State.value () and login = login and lobby_sel = lobby_sel and lobby = lobby and board = board and toolbar = toolbar in
   let content =
     match m.connection_error with
     | Some msg ->
@@ -40,7 +41,7 @@ let app (local_ graph) =
         let main = if not (D.is_in_lobby m) then lobby_sel else if not (D.is_game_in_progress m) then lobby else board in
         {%html.jsx|<div>%{toolbar}<div *{[ Ui.container ]}>%{main}</div></div>|})
   in
-  {%html.jsx|<div *{[ Ui.app ]}>%{modals}%{content}</div>|}
+  {%html.jsx|<div *{[ Ui.app ]}>%{content}</div>|}
 ;;
 
 let run_app () =

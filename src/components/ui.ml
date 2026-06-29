@@ -1,5 +1,6 @@
 open! Core
 open Bonsai_web
+open Bonsai.Let_syntax
 open Avalon_core
 open Types
 module N = Vdom.Node
@@ -106,10 +107,12 @@ module Style =
   /* welcome / hero card (login + the connection-error screen) */
   .welcome { padding: 30px 24px; text-align: center; background: #e0f7fa; max-width: 600px; margin: 24px auto; }
 
-  /* overlays / dialogs */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+  /* dialog content card (rendered inside a toplayer modal — see [modal] below) */
   .overlay_card { background: #e0f7fa; border-radius: 8px; max-width: 460px; width: 100%; max-height: 90vh; overflow: auto; }
-  .fullscreen { max-width: 100%; width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+  /* toplayer modal container: center it in the top layer and dim the background, matching
+     the look the hand-rolled overlay used to give. */
+  .modal_box { position: fixed; inset: 0; margin: auto; width: fit-content; height: fit-content; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); border: none; background: transparent; padding: 0; overflow: visible; }
+  .modal_box::backdrop { background: rgba(0,0,0,0.5); }
 
   /* FontAwesome layering; .fa-layers itself is global (index.html) */
   .layers_text { font-size: 0.55em; top: 35%; font-weight: 700; }
@@ -161,13 +164,30 @@ let team_icon (t : team) = match t with Good -> fa "fab" "fa-old-republic" | Evi
    library's hook, styled globally in index.html). *)
 let fa_layers ?(attrs = []) children = {%html.jsx|<span *{A.class_ "fa-layers" :: attrs}>*{children}</span>|}
 
-let overlay ?(fullscreen = false) ~on_close children =
-  let inner = if fullscreen then [ Style.overlay_card; Style.fullscreen ] else [ Style.overlay_card ] in
-  {%html.jsx|
-    <div *{[ Style.overlay ]} on_click=%{fun _ -> on_close}>
-      <div *{inner} on_click=%{fun _ -> Effect.Many []}>*{children}</div>
-    </div>
-  |}
+(* A centered, dimmed, focus-trapped, Esc/click-outside-closable modal (toplayer), shown
+   while [value] is [Some]. The modal is portaled into the browser's top layer, so this is a
+   graph-level component returning [unit] rather than a node to splice into the tree. Closing
+   (Esc, click-outside, or a [~close]-driven button) runs [on_close]; typically that clears
+   the same [value] option you pass in. *)
+let modal value ~on_close ~content (local_ graph) : unit =
+  let autoclose =
+    Bonsai_web_toplayer.Autoclose.create ~close:on_close ~close_on_esc:(Bonsai.return true) graph
+  in
+  let (_ : unit Bonsai.t) =
+    match%sub value with
+    | Some v ->
+      Bonsai_web_toplayer.Modal.always_open
+        ~attrs:(Bonsai.return [ Style.modal_box ])
+        ~autoclose
+        ~lock_body_scroll:(Bonsai.return true)
+        ~content:(fun (local_ _graph) ->
+          let%arr v = v and on_close = on_close in
+          content v ~close:on_close)
+        graph;
+      Bonsai.return ()
+    | None -> Bonsai.return ()
+  in
+  ()
 ;;
 
 let text_field ?(attrs = []) ?(typ = "text") ?(placeholder = "") ?(extra = []) ~value ~on_input () =
@@ -181,6 +201,12 @@ let text_field ?(attrs = []) ?(typ = "text") ?(placeholder = "") ?(extra = []) ~
 
 (* inline error text (named [error_text] to leave the [field_error] class accessor free) *)
 let error_text error = if String.is_empty error then N.none else {%html.jsx|<div *{[ Style.field_error ]}>#{error}</div>|}
+
+(* A styled, touch-capable hover tooltip (toplayer), replacing bare [title=] attributes: it
+   renders a real positioned box that also works on tap, unlike the native browser title. *)
+let tooltip_text (s : string) : Vdom.Attr.t =
+  Bonsai_web_toplayer.tooltip ~show_delay:(Time_ns.Span.of_ms 200.) (N.text s)
+;;
 
 (* mailto feedback link, styled as a button (port of the Vue "Email"/"Send feedback" btns) *)
 let feedback_link label =
@@ -233,5 +259,7 @@ let li_title = Style.li_title
 let li_append = Style.li_append
 let field_error = Style.field_error
 let welcome = Style.welcome
+let overlay_card = Style.overlay_card
+let modal_box = Style.modal_box
 let layers_text = Style.layers_text
 let spinner_lg = Style.spinner_lg
