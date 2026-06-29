@@ -9,9 +9,10 @@ open Js_of_ocaml
     passed where a reference is expected, and JS objects are read only through the typed
     accessors below — never via raw [Js.Unsafe] in callers.
 
-    The project has no bundler: {!on_ready} loads the modular ESM entry points itself via a
-    runtime dynamic [import()] and merges their exports into one lookup object. Wrap setup in
-    {!on_ready} so it runs only after that asynchronous import has completed. *)
+    The modular SDK is shipped as a vendored, esbuild-bundled artifact (see [shim/]) that is
+    embedded into the page bundle via [(js_of_ocaml (javascript_files ...))] and exposes its
+    exports on [globalThis.__fb] — present synchronously, no gstatic CDN, no dynamic [import()].
+    Wrap setup in {!on_ready}, which snapshots that global once before running its callback. *)
 
 type any = Js.Unsafe.any
 type user = any
@@ -161,35 +162,29 @@ let error_code (e : error) : string = field_string e "code"
 
 (* ---- readiness ---- *)
 
-let firebasejs_base = "https://www.gstatic.com/firebasejs/12.3.0/"
-
-(* Load the three modular entry points in parallel via runtime dynamic [import()] and merge
-   their named exports into one object (Object.assign over the module namespaces), then run
-   [f]. Repeat calls reuse the already-loaded exports. *)
+(* The modular SDK is shipped as a vendored bundle (firebase/shim, built to
+   firebase/vendor/firebase-shim.js) that is embedded into the page bundle via
+   [(js_of_ocaml (javascript_files ...))] in [firebase/dune] — exactly like the
+   bonsai_web_components bindings ship their JS. It runs at startup and exposes its named
+   exports on [globalThis.__fb], so they are present synchronously with no gstatic CDN and no
+   runtime dynamic [import()]. [on_ready] simply snapshots that global once and runs [f]; the
+   asynchronous-load API shape is kept so callers (and {!on_error}) are unaffected. *)
 let on_ready ?(on_error = fun () -> ()) (f : unit -> unit) : unit =
   match !exports_ref with
   | Some _ -> f ()
   | None ->
-    let load =
-      Js.Unsafe.fun_call
-        (Js.Unsafe.js_expr
-           "(function(a,b,c){return Promise.all([import(a),import(b),import(c)]).then(function(m){return \
-            Object.assign({},m[0],m[1],m[2]);});})")
-        [| inject (str (firebasejs_base ^ "firebase-app.js"))
-         ; inject (str (firebasejs_base ^ "firebase-auth.js"))
-         ; inject (str (firebasejs_base ^ "firebase-firestore.js"))
-        |]
-    in
-    promise_then
-      load
-      ~on_ok:(fun merged ->
-        exports_ref := Some merged;
-        f ())
-      ~on_err:(fun e ->
-        ignore
-          (Js.Unsafe.fun_call
-             (Js.Unsafe.js_expr "(function(e){console.error('Failed to load Firebase SDK',e);})")
-             [| inject e |]
-            : any);
-        on_error ())
+    let g = Js.Unsafe.get Js.Unsafe.global (str "__fb") in
+    if is_nullish g
+    then (
+      ignore
+        (Js.Unsafe.fun_call
+           (Js.Unsafe.js_expr
+              "(function(){console.error('Firebase SDK bundle missing: globalThis.__fb is not \
+               set (firebase/vendor/firebase-shim.js not embedded?)');})")
+           [||]
+          : any);
+      on_error ())
+    else (
+      exports_ref := Some g;
+      f ())
 ;;

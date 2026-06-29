@@ -2,4 +2,10 @@
  (name firebase)
  (libraries core js_of_ocaml)
  (flags
-  (:standard -w +70 -warn-error +70)))
+  (:standard -w +70 -warn-error +70))
+ ; Embed the vendored Firebase SDK bundle (built from shim/ to vendor/firebase-shim.js)
+ ; directly into any js_of_ocaml executable that links this library, exactly like the
+ ; bonsai_web_components bindings ship their JS. The bundle runs at startup and exposes the
+ ; SDK on globalThis.__fb — no gstatic CDN, no runtime import(). Rebuild: see shim/README.md.
+ (js_of_ocaml
+  (javascript_files vendor/firebase-shim.js)))

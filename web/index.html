@@ -35,13 +35,9 @@
       .fa-layers > * { position: absolute; left: 0; top: 0; width: 100%; text-align: center; }
     </style>
 
-    <!-- Firebase v12 *modular* SDK is loaded by the app itself via dynamic import()
-         (see Firebase.on_ready in firebase/firebase.ml). These modulepreload hints just let
-         the browser fetch the entry points in parallel with main.bc.js; keep the version in
-         sync with firebasejs_base there. -->
-    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js" />
-    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js" />
-    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js" />
+    <!-- The Firebase v12 modular SDK is embedded directly into main.bc.js (vendored bundle
+         firebase/vendor/firebase-shim.js, linked via firebase/dune), so there is nothing to
+         preload or fetch from gstatic at runtime. -->
   </head>
   <body>
     <div id="app"></div>
