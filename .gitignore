@@ -1,3 +1,7 @@
 _build/
 *.install
 .merlin
+
+# nix build artifacts
+result
+result-*
