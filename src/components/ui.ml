@@ -7,17 +7,18 @@ module N = Vdom.Node
 module A = Vdom.Attr
 
 (** Shared UI foundation: the generic "design system" used by every component — the small
-    set of node-building helpers ([div]/[card]/[btn]/[fa]/[overlay]/[text_field]/...) plus the
-    reusable layout, spacing, typography, button, card, tab and list-item style classes.
+    set of node-building helpers ([div]/[card]/[btn]/[fa]/[overlay]/[text_field]/...) plus
+    the reusable layout, spacing, typography, button, card, tab and list-item style
+    classes.
 
     Component-specific styling is co-located in each component module instead (e.g. the
-    welcome heading in {!Login}, the mission tab colours in {!Missions}); only the generic,
-    cross-component vocabulary lives here.
+    welcome heading in {!Login}, the mission tab colours in {!Missions}); only the
+    generic, cross-component vocabulary lives here.
 
-    A handful of class names are kept as literal (un-hashed) strings because the Playwright
-    e2e suite and imperative DOM code select on them ([v-list], [v-list-item], [lobby-name],
-    [bottom-sheet], the FontAwesome [fa-layers] helper, and the icon-font classes from
-    [fa]/[mdi]); those live as plain CSS in [web/index.html]. *)
+    A handful of class names are kept as literal (un-hashed) strings because the
+    Playwright e2e suite and imperative DOM code select on them ([v-list], [v-list-item],
+    [lobby-name], [bottom-sheet], the FontAwesome [fa-layers] helper, and the icon-font
+    classes from [fa]/[mdi]); those live as plain CSS in [web/index.html]. *)
 
 module Style =
   [%css
@@ -135,43 +136,69 @@ let on_enter e = A.on_keyup (fun ev -> if ev##.keyCode = 13 then e else Effect.r
 
 let swap_at (l : 'a list) i =
   match List.nth l i, List.nth l (i + 1) with
-  | Some a, Some b -> List.mapi l ~f:(fun j x -> if j = i then b else if j = i + 1 then a else x)
+  | Some a, Some b ->
+    List.mapi l ~f:(fun j x -> if j = i then b else if j = i + 1 then a else x)
   | _ -> l
 ;;
 
 (* ---- building blocks, rendered with ppx_html + the Style module ---- *)
 let div ?(attrs = []) children = {%html.jsx|<div *{attrs}>*{children}</div>|}
 let spanc ?(attrs = []) children = {%html.jsx|<span *{attrs}>*{children}</span>|}
-let card ?(attrs = []) children = {%html.jsx|<div *{Style.card :: attrs}>*{children}</div>|}
-let card_title ?(attrs = []) children = {%html.jsx|<div *{Style.card_title :: attrs}>*{children}</div>|}
-let card_text ?(attrs = []) children = {%html.jsx|<div *{Style.card_text :: attrs}>*{children}</div>|}
+
+let card ?(attrs = []) children =
+  {%html.jsx|<div *{Style.card :: attrs}>*{children}</div>|}
+;;
+
+let card_title ?(attrs = []) children =
+  {%html.jsx|<div *{Style.card_title :: attrs}>*{children}</div>|}
+;;
+
+let card_text ?(attrs = []) children =
+  {%html.jsx|<div *{Style.card_text :: attrs}>*{children}</div>|}
+;;
 
 let btn ?(attrs = []) ?(disabled = false) ?(loading = false) ~on_click children =
-  let attrs = (Style.btn :: attrs) @ (if disabled || loading then [ A.disabled' true ] else []) in
-  let children = if loading then [ {%html.jsx|<span *{[ Style.spinner ]}></span>|} ] else children in
+  let attrs =
+    (Style.btn :: attrs) @ if disabled || loading then [ A.disabled' true ] else []
+  in
+  let children =
+    if loading then [ {%html.jsx|<span *{[ Style.spinner ]}></span>|} ] else children
+  in
   {%html.jsx|<button *{attrs} on_click=%{fun _ -> on_click}>*{children}</button>|}
 ;;
 
 let fa ?(color = "") kind name =
-  let style = if String.is_empty color then [] else [ A.style (Css_gen.color (`Name color)) ] in
+  let style =
+    if String.is_empty color then [] else [ A.style (Css_gen.color (`Name color)) ]
+  in
   N.create "i" ~attrs:(A.classes [ kind; name ] :: style) []
 ;;
 
 let mdi name = N.create "i" ~attrs:[ A.classes [ "mdi"; "mdi-" ^ name ] ] []
-let team_icon (t : team) = match t with Good -> fa "fab" "fa-old-republic" | Evil -> fa ~color:"red" "fab" "fa-empire"
+
+let team_icon (t : team) =
+  match t with
+  | Good -> fa "fab" "fa-old-republic"
+  | Evil -> fa ~color:"red" "fab" "fa-empire"
+;;
 
 (* FontAwesome icon stacking; [fa-layers] is kept as a literal class (it is the external
    library's hook, styled globally in index.html). *)
-let fa_layers ?(attrs = []) children = {%html.jsx|<span *{A.class_ "fa-layers" :: attrs}>*{children}</span>|}
+let fa_layers ?(attrs = []) children =
+  {%html.jsx|<span *{A.class_ "fa-layers" :: attrs}>*{children}</span>|}
+;;
 
 (* A centered, dimmed, focus-trapped, Esc/click-outside-closable modal (toplayer), shown
-   while [value] is [Some]. The modal is portaled into the browser's top layer, so this is a
-   graph-level component returning [unit] rather than a node to splice into the tree. Closing
-   (Esc, click-outside, or a [~close]-driven button) runs [on_close]; typically that clears
-   the same [value] option you pass in. *)
+   while [value] is [Some]. The modal is portaled into the browser's top layer, so this is
+   a graph-level component returning [unit] rather than a node to splice into the tree.
+   Closing (Esc, click-outside, or a [~close]-driven button) runs [on_close]; typically
+   that clears the same [value] option you pass in. *)
 let modal value ~on_close ~content (local_ graph) : unit =
   let autoclose =
-    Bonsai_web_toplayer.Autoclose.create ~close:on_close ~close_on_esc:(Bonsai.return true) graph
+    Bonsai_web_toplayer.Autoclose.create
+      ~close:on_close
+      ~close_on_esc:(Bonsai.return true)
+      graph
   in
   let (_ : unit Bonsai.t) =
     match%sub value with
@@ -181,7 +208,7 @@ let modal value ~on_close ~content (local_ graph) : unit =
         ~autoclose
         ~lock_body_scroll:(Bonsai.return true)
         ~content:(fun (local_ _graph) ->
-          let%arr v = v and on_close = on_close in
+          let%arr v and on_close in
           content v ~close:on_close)
         graph;
       Bonsai.return ()
@@ -190,20 +217,37 @@ let modal value ~on_close ~content (local_ graph) : unit =
   ()
 ;;
 
-let text_field ?(attrs = []) ?(typ = "text") ?(placeholder = "") ?(extra = []) ~value ~on_input () =
+let text_field
+  ?(attrs = [])
+  ?(typ = "text")
+  ?(placeholder = "")
+  ?(extra = [])
+  ~value
+  ~on_input
+  ()
+  =
   let all =
     (Style.text_field :: attrs)
-    @ [ A.type_ typ; A.placeholder placeholder; A.value_prop value; A.on_input (fun _ s -> on_input s) ]
+    @ [ A.type_ typ
+      ; A.placeholder placeholder
+      ; A.value_prop value
+      ; A.on_input (fun _ s -> on_input s)
+      ]
     @ extra
   in
   {%html.jsx|<input *{all} />|}
 ;;
 
 (* inline error text (named [error_text] to leave the [field_error] class accessor free) *)
-let error_text error = if String.is_empty error then N.none else {%html.jsx|<div *{[ Style.field_error ]}>#{error}</div>|}
+let error_text error =
+  if String.is_empty error
+  then N.none
+  else {%html.jsx|<div *{[ Style.field_error ]}>#{error}</div>|}
+;;
 
-(* A styled, touch-capable hover tooltip (toplayer), replacing bare [title=] attributes: it
-   renders a real positioned box that also works on tap, unlike the native browser title. *)
+(* A styled, touch-capable hover tooltip (toplayer), replacing bare [title=] attributes:
+   it renders a real positioned box that also works on tap, unlike the native browser
+   title. *)
 let tooltip_text (s : string) : Vdom.Attr.t =
   Bonsai_web_toplayer.tooltip ~show_delay:(Time_ns.Span.of_ms 200.) (N.text s)
 ;;
@@ -214,8 +258,8 @@ let feedback_link label =
 ;;
 
 (* ---- shared style-class accessors re-exported for use across component modules ----
-   (the clashing card/card_title/card_text/btn/text_field/overlay classes stay internal and
-   are reached only through the helper functions above). *)
+   (the clashing card/card_title/card_text/btn/text_field/overlay classes stay internal
+   and are reached only through the helper functions above). *)
 let app = Style.app
 let container = Style.container
 let row = Style.row

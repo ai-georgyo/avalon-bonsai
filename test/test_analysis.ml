@@ -4,11 +4,15 @@ open Avalon_core
 let lines l = String.concat ~sep:"\n" l
 
 (* A clean good win where evil was never placed on a mission. Locks in the badge engine:
-   the exact set here matches what the live e2e game produced (Lockdown / Clean sweep /
-   "I trust you guys"), plus the deductions that follow from the fixture's roles. *)
+   the exact set here matches what the live e2e game produced (Lockdown / Clean sweep / "I
+   trust you guys"), plus the deductions that follow from the fixture's roles. *)
 let%test_unit "badges for a clean good win" =
   let t = Analysis.create Fixtures.good_win ~role_map:Fixtures.role_map in
-  let actual = lines (List.map (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) -> sprintf "- %s: %s" b.title b.body)) in
+  let actual =
+    lines
+      (List.map (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) ->
+         sprintf "- %s: %s" b.title b.body))
+  in
   [%test_result: string]
     actual
     ~expect:
@@ -24,19 +28,29 @@ let%test_unit "badges for a clean good win" =
          ])
 ;;
 
-let badge_lines t = lines (List.map (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) -> sprintf "- %s: %s" b.title b.body))
+let badge_lines t =
+  lines
+    (List.map (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) ->
+       sprintf "- %s: %s" b.title b.body))
+;;
 
 let find_body t title =
-  match List.find (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) -> String.equal b.title title) with
+  match
+    List.find (Analysis.get_badges t) ~f:(fun (b : Analysis.badge) ->
+      String.equal b.title title)
+  with
   | Some b -> b.body
   | None -> "<absent>"
 ;;
 
 (* Guards the psychic_powers tie-break: ALICE and BOB both have two perfect proposals; the
-   badge must name the earliest-seated (ALICE), not whichever a hashtable happens to yield. *)
+   badge must name the earliest-seated (ALICE), not whichever a hashtable happens to
+   yield. *)
 let%test_unit "Actual Merlin tie-break is deterministic (earliest seat)" =
   let t = Analysis.create Fixtures.psychic_tie ~role_map:Fixtures.role_map in
-  [%test_result: string] (find_body t "Actual Merlin") ~expect:"ALICE proposed 2 perfect teams and no bad teams"
+  [%test_result: string]
+    (find_body t "Actual Merlin")
+    ~expect:"ALICE proposed 2 perfect teams and no bad teams"
 ;;
 
 (* Guards the proposer_curse tie-break: ALICE and BOB each have three rejected proposals;
@@ -45,16 +59,25 @@ let%test_unit "Cursed proposer tie-break is deterministic (first rejected)" =
   let mission0 =
     { (List.hd_exn Fixtures.good_win.missions) with
       proposals =
-        [ Fixtures.rejected "ALICE" [ "ALICE"; "BOB" ]; Fixtures.rejected "BOB" [ "BOB"; "CARL" ]
-        ; Fixtures.rejected "ALICE" [ "ALICE"; "CARL" ]; Fixtures.rejected "BOB" [ "ALICE"; "BOB" ]
-        ; Fixtures.rejected "ALICE" [ "BOB"; "CARL" ]; Fixtures.rejected "BOB" [ "ALICE"; "CARL" ]
+        [ Fixtures.rejected "ALICE" [ "ALICE"; "BOB" ]
+        ; Fixtures.rejected "BOB" [ "BOB"; "CARL" ]
+        ; Fixtures.rejected "ALICE" [ "ALICE"; "CARL" ]
+        ; Fixtures.rejected "BOB" [ "ALICE"; "BOB" ]
+        ; Fixtures.rejected "ALICE" [ "BOB"; "CARL" ]
+        ; Fixtures.rejected "BOB" [ "ALICE"; "CARL" ]
         ; Fixtures.approved "ALICE" [ "ALICE"; "BOB" ]
         ]
     }
   in
-  let data = { Fixtures.good_win with missions = mission0 :: List.tl_exn Fixtures.good_win.missions } in
+  let data =
+    { Fixtures.good_win with
+      missions = mission0 :: List.tl_exn Fixtures.good_win.missions
+    }
+  in
   let t = Analysis.create data ~role_map:Fixtures.role_map in
-  [%test_result: string] (find_body t "Cursed proposer") ~expect:"ALICE had 3 proposals rejected"
+  [%test_result: string]
+    (find_body t "Cursed proposer")
+    ~expect:"ALICE had 3 proposals rejected"
 ;;
 
 (* Locks in the badge set for an evil win by assassination — exercises the assassination,

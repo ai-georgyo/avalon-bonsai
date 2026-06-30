@@ -9,83 +9,144 @@ module N = Vdom.Node
 module A = Vdom.Attr
 
 (** The in-game participants panel: the live player list (with proposer crown, hammer, and
-    per-player vote-status icons) and a tab toggle to the role list. Uses only shared {!Ui}
-    styling. *)
+    per-player vote-status icons) and a tab toggle to the role list. Uses only shared
+    {!Ui} styling. *)
 
 (* ---- GamePlayerList (private) ---- *)
 let game_player_list ~selected ~set_selected (local_ graph) =
-  let%arr m = State.value () and selected = selected and set_selected = set_selected in
+  let%arr m = State.value ()
+  and selected
+  and set_selected in
   match D.game m, D.role m with
   | Some g, role_doc ->
     let me = D.user_name m in
     let phase = Game.phase g in
     let assassin = Option.value_map role_doc ~default:false ~f:(fun r -> r.assassin) in
-    let team_size = Option.value_map g.current_mission ~default:1 ~f:(fun mi -> mi.team_size) in
+    let team_size =
+      Option.value_map g.current_mission ~default:1 ~f:(fun mi -> mi.team_size)
+    in
     let max_selected = if String.equal phase "TEAM_PROPOSAL" then team_size else 1 in
     let toggle name =
       let next =
-        if List.mem selected name ~equal:String.equal then List.filter selected ~f:(fun x -> not (String.equal x name)) else selected @ [ name ]
+        if List.mem selected name ~equal:String.equal
+        then List.filter selected ~f:(fun x -> not (String.equal x name))
+        else selected @ [ name ]
       in
-      let next = if List.length next > max_selected then List.drop next (List.length next - max_selected) else next in
+      let next =
+        if List.length next > max_selected
+        then List.drop next (List.length next - max_selected)
+        else next
+      in
       set_selected next
     in
     let enable_checkbox name =
-      (String.equal phase "TEAM_PROPOSAL" && Option.value_map g.current_proposer ~default:false ~f:(String.equal me))
+      (String.equal phase "TEAM_PROPOSAL"
+       && Option.value_map g.current_proposer ~default:false ~f:(String.equal me))
       || (String.equal phase "ASSASSINATION" && assassin && not (String.equal name me))
     in
     let selected_for_mission name =
       (String.equal phase "PROPOSAL_VOTE" || String.equal phase "MISSION_VOTE")
-      && Option.value_map g.current_proposal ~default:false ~f:(fun p -> List.mem p.team name ~equal:String.equal)
+      && Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+        List.mem p.team name ~equal:String.equal)
     in
     let was_on_last name =
       match phase with
-      | "TEAM_PROPOSAL" | "ASSASSINATION" -> Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p -> List.mem p.team name ~equal:String.equal)
-      | "PROPOSAL_VOTE" | "MISSION_VOTE" -> Option.value_map g.current_proposal ~default:false ~f:(fun p -> List.mem p.team name ~equal:String.equal)
+      | "TEAM_PROPOSAL" | "ASSASSINATION" ->
+        Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p ->
+          List.mem p.team name ~equal:String.equal)
+      | "PROPOSAL_VOTE" | "MISSION_VOTE" ->
+        Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+          List.mem p.team name ~equal:String.equal)
       | _ -> false
     in
-    let has_voted name = String.equal phase "PROPOSAL_VOTE" && Option.value_map g.current_proposal ~default:false ~f:(fun p -> List.mem p.votes name ~equal:String.equal) in
-    let waiting name = String.equal phase "PROPOSAL_VOTE" && not (Option.value_map g.current_proposal ~default:false ~f:(fun p -> List.mem p.votes name ~equal:String.equal)) in
+    let has_voted name =
+      String.equal phase "PROPOSAL_VOTE"
+      && Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+        List.mem p.votes name ~equal:String.equal)
+    in
+    let waiting name =
+      String.equal phase "PROPOSAL_VOTE"
+      && not
+           (Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+              List.mem p.votes name ~equal:String.equal))
+    in
     let approved name =
-      if String.equal phase "TEAM_PROPOSAL" || String.equal phase "ASSASSINATION" then Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p -> List.mem p.votes name ~equal:String.equal)
-      else if String.equal phase "MISSION_VOTE" then Option.value_map g.current_proposal ~default:false ~f:(fun p -> List.mem p.votes name ~equal:String.equal)
+      if String.equal phase "TEAM_PROPOSAL" || String.equal phase "ASSASSINATION"
+      then
+        Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p ->
+          List.mem p.votes name ~equal:String.equal)
+      else if String.equal phase "MISSION_VOTE"
+      then
+        Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+          List.mem p.votes name ~equal:String.equal)
       else false
     in
     let rejected name =
-      if String.equal phase "TEAM_PROPOSAL" || String.equal phase "ASSASSINATION" then Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p -> not (List.mem p.votes name ~equal:String.equal))
-      else if String.equal phase "MISSION_VOTE" then Option.value_map g.current_proposal ~default:false ~f:(fun p -> not (List.mem p.votes name ~equal:String.equal))
+      if String.equal phase "TEAM_PROPOSAL" || String.equal phase "ASSASSINATION"
+      then
+        Option.value_map (Game.last_proposal g) ~default:false ~f:(fun p ->
+          not (List.mem p.votes name ~equal:String.equal))
+      else if String.equal phase "MISSION_VOTE"
+      then
+        Option.value_map g.current_proposal ~default:false ~f:(fun p ->
+          not (List.mem p.votes name ~equal:String.equal))
       else false
     in
     let crown_color = if g.current_proposal_idx < 4 then "#fcfc00" else "#cc0808" in
     let status_icons name =
       let icons =
         List.filter_opt
-          [ (if was_on_last name then Some (fa ~color:"#629ec1" "far" "fa-circle") else None)
-          ; (if waiting name then Some (fa ~color:"#4c4c4c" "fas" "fa-ellipsis-h")
-             else if has_voted name then Some (fa ~color:"#4c4c4c" "fas" "fa-vote-yea")
-             else if approved name then Some (fa ~color:"green" "far" "fa-thumbs-up")
-             else if rejected name then Some (fa ~color:"#ed1515" "far" "fa-thumbs-down")
+          [ (if was_on_last name
+             then Some (fa ~color:"#629ec1" "far" "fa-circle")
+             else None)
+          ; (if waiting name
+             then Some (fa ~color:"#4c4c4c" "fas" "fa-ellipsis-h")
+             else if has_voted name
+             then Some (fa ~color:"#4c4c4c" "fas" "fa-vote-yea")
+             else if approved name
+             then Some (fa ~color:"green" "far" "fa-thumbs-up")
+             else if rejected name
+             then Some (fa ~color:"#ed1515" "far" "fa-thumbs-down")
              else None)
           ]
       in
-      (* Mirror Vue's tooltipText so the otherwise-cryptic status icons are explained on hover. *)
+      (* Mirror Vue's tooltipText so the otherwise-cryptic status icons are explained on
+         hover. *)
       let states =
         List.filter_opt
           [ (if was_on_last name then Some "was on the last proposed team" else None)
-          ; (if waiting name then Some "is currently voting on the proposal"
-             else if has_voted name then Some "has submitted a vote for the proposed team"
-             else if approved name then Some "approved the last team"
-             else if rejected name then Some "rejected the last team"
+          ; (if waiting name
+             then Some "is currently voting on the proposal"
+             else if has_voted name
+             then Some "has submitted a vote for the proposed team"
+             else if approved name
+             then Some "approved the last team"
+             else if rejected name
+             then Some "rejected the last team"
              else None)
           ]
       in
       if List.is_empty icons
       then N.none
-      else fa_layers ~attrs:[ Ui.tooltip_text (sprintf "%s %s" name (Util.join_with_and states)) ] icons
+      else
+        fa_layers
+          ~attrs:[ Ui.tooltip_text (sprintf "%s %s" name (Util.join_with_and states)) ]
+          icons
     in
     let item name =
       let checkbox =
-        if enable_checkbox name then N.input ~attrs:[ A.type_ "checkbox"; A.checked_prop (List.mem selected name ~equal:String.equal); A.on_click (fun _ -> toggle name) ] ()
-        else if selected_for_mission name then N.input ~attrs:[ A.type_ "checkbox"; A.checked_prop true; A.disabled' true ] ()
+        if enable_checkbox name
+        then
+          N.input
+            ~attrs:
+              [ A.type_ "checkbox"
+              ; A.checked_prop (List.mem selected name ~equal:String.equal)
+              ; A.on_click (fun _ -> toggle name)
+              ]
+            ()
+        else if selected_for_mission name
+        then
+          N.input ~attrs:[ A.type_ "checkbox"; A.checked_prop true; A.disabled' true ] ()
         else N.none
       in
       let marker =
@@ -93,8 +154,13 @@ let game_player_list ~selected ~set_selected (local_ graph) =
         then
           fa_layers
             ~attrs:[ Ui.tooltip_text (sprintf "%s is proposing the next team" name) ]
-            [ fa ~color:crown_color "fas" "fa-crown"; spanc ~attrs:[ Ui.layers_text ] [ N.text (Int.to_string (g.current_proposal_idx + 1)) ] ]
-        else if Option.value_map g.hammer ~default:false ~f:(String.equal name) then fa "fas" "fa-hammer"
+            [ fa ~color:crown_color "fas" "fa-crown"
+            ; spanc
+                ~attrs:[ Ui.layers_text ]
+                [ N.text (Int.to_string (g.current_proposal_idx + 1)) ]
+            ]
+        else if Option.value_map g.hammer ~default:false ~f:(String.equal name)
+        then fa "fas" "fa-hammer"
         else N.none
       in
       {%html.jsx|
@@ -115,13 +181,22 @@ let game_player_list ~selected ~set_selected (local_ graph) =
 let game_participants ~selected ~set_selected (local_ graph) =
   let tab, set_tab = Bonsai.state "players" graph in
   let players = game_player_list ~selected ~set_selected graph in
-  let%arr m = State.value () and tab = tab and set_tab = set_tab and players = players in
+  let%arr m = State.value ()
+  and tab
+  and set_tab
+  and players in
   match D.game m with
   | None -> N.none
   | Some g ->
-    let role_objs = List.filter_map (Game.roles g) ~f:(fun r -> Map.find Avalonlib.role_map r) in
-    let tab_attrs value = if String.equal tab value then [ Ui.tab; Ui.tab_active ] else [ Ui.tab ] in
-    let body = if String.equal tab "players" then players else Role_list.role_list_view role_objs in
+    let role_objs =
+      List.filter_map (Game.roles g) ~f:(fun r -> Map.find Avalonlib.role_map r)
+    in
+    let tab_attrs value =
+      if String.equal tab value then [ Ui.tab; Ui.tab_active ] else [ Ui.tab ]
+    in
+    let body =
+      if String.equal tab "players" then players else Role_list.role_list_view role_objs
+    in
     {%html.jsx|
       <div>
         <div *{[ Ui.tabs ]}>

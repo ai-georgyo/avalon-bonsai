@@ -3,7 +3,14 @@
  ; unwrapped so the view layer (avalon_components) can reference State/Ffi/Parse/Api/Toast
  ; by their bare names, matching how they were referenced when they shared a library.
  (wrapped false)
- (libraries core bonsai bonsai_web virtual_dom js_of_ocaml avalon_core firebase)
+ (libraries
+  core
+  bonsai
+  bonsai_web
+  virtual_dom
+  js_of_ocaml
+  avalon_core
+  firebase)
  (flags
   (:standard -w +70 -warn-error +70))
  (preprocess

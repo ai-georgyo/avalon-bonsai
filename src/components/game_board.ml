@@ -10,8 +10,7 @@ module N = Vdom.Node
 
 module Style =
   [%css
-  stylesheet
-    {|
+  stylesheet {|
   .game_board { width: 100%; }
   .game_section { padding: 8px 0; }
 |}]
@@ -30,14 +29,14 @@ let game_board (local_ graph) =
       phase
       ~equal:String.equal
       ~callback:
-        (let%arr set_selected = set_selected in
+        (let%arr set_selected in
          fun _ -> set_selected [])
       graph
   in
   let missions = Missions.game_missions graph in
   let participants = Player_list.game_participants ~selected ~set_selected graph in
   let actions = Actions.action_pane ~selected graph in
-  let%arr missions = missions and participants = participants and actions = actions in
+  let%arr missions and participants and actions in
   {%html.jsx|
     <div *{[ Style.game_board ]}>
       <div *{[ Style.game_section ]}>%{missions}</div>

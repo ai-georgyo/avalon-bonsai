@@ -51,7 +51,8 @@ let game_data (v : Ffi.any) : game_data =
   { state = game_state_of_string (Ffi.field_string v "state")
   ; phase = Ffi.field_string v "phase"
   ; players = Ffi.field_str_list v "players"
-  ; roles = (if Ffi.is_nullish (Ffi.get v "roles") then [] else Ffi.field_str_list v "roles")
+  ; roles =
+      (if Ffi.is_nullish (Ffi.get v "roles") then [] else Ffi.field_str_list v "roles")
   ; missions = Ffi.to_list (Ffi.get v "missions") |> List.map ~f:mission
   ; outcome = (if Ffi.is_nullish outcome_v then None else Some (outcome outcome_v))
   ; in_game_log =
@@ -98,7 +99,7 @@ let user_data (v : Ffi.any) : user_data =
   }
 ;;
 
-(* RoleDoc: raw { role: string; sees?: string[]; assassin?: bool } with role name
+(* RoleDoc: raw [{ role: string; sees?: string[]; assassin?: bool }] with role name
    resolved to a full Role via the role map. *)
 let role_doc (v : Ffi.any) : role_doc option =
   if Ffi.is_nullish v
@@ -110,7 +111,8 @@ let role_doc (v : Ffi.any) : role_doc option =
     | Some role ->
       Some
         { role
-        ; sees = (if Ffi.is_nullish (Ffi.get v "sees") then [] else Ffi.field_str_list v "sees")
+        ; sees =
+            (if Ffi.is_nullish (Ffi.get v "sees") then [] else Ffi.field_str_list v "sees")
         ; assassin = Ffi.field_bool v "assassin"
         })
 ;;

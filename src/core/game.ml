@@ -1,8 +1,8 @@
 open! Core
 open Types
 
-(** Derived game state, ported from the [Game] class in client/src/avalon.ts.
-    Pure: computed from {!Types.game_data} plus the role map. *)
+(** Derived game state, ported from the [Game] class in client/src/avalon.ts. Pure:
+    computed from {!Types.game_data} plus the role map. *)
 
 type t =
   { data : game_data
@@ -42,9 +42,7 @@ let create (data : game_data) ~role_map : t =
     let missions = data.missions in
     let num_players = List.length data.players in
     let current_mission_idx =
-      match
-        List.findi missions ~f:(fun _ m -> equal_mission_state m.state M_pending)
-      with
+      match List.findi missions ~f:(fun _ m -> equal_mission_state m.state M_pending) with
       | Some (i, _) -> i
       | None -> -1
     in
@@ -105,8 +103,10 @@ let last_proposal (t : t) : proposal option =
   else if t.current_mission_idx <= 0
   then None
   else
-    Option.bind (List.nth t.data.missions (t.current_mission_idx - 1)) ~f:(fun m ->
-      List.find m.proposals ~f:(fun p -> equal_proposal_state p.state Approved))
+    Option.bind
+      (List.nth t.data.missions (t.current_mission_idx - 1))
+      ~f:(fun m ->
+        List.find m.proposals ~f:(fun p -> equal_proposal_state p.state Approved))
 ;;
 
 let get_num_team (t : t) (team : team) : int =

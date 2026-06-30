@@ -1,8 +1,8 @@
 open! Core
 open Js_of_ocaml
 
-(** REST client, port of client/src/avalon-api-rest.ts. Each call fetches a fresh
-    Firebase ID token, then POSTs JSON to /api/<endpoint> with the X-Avalon-Auth header. *)
+(** REST client, port of client/src/avalon-api-rest.ts. Each call fetches a fresh Firebase
+    ID token, then POSTs JSON to /api/<endpoint> with the X-Avalon-Auth header. *)
 
 let post
   ~(endpoint : string)
@@ -60,7 +60,11 @@ let ignore_ok _ = ()
 let ignore_err _ = ()
 
 let login ?(on_ok = ignore_ok) ?(on_err = ignore_err) (email : string option) =
-  let email_value = match email with Some e -> Ffi.of_string e | None -> Ffi.null_value in
+  let email_value =
+    match email with
+    | Some e -> Ffi.of_string e
+    | None -> Ffi.null_value
+  in
   post ~endpoint:"login" ~data:[ "email", email_value ] ~on_ok ~on_err
 ;;
 
@@ -96,7 +100,16 @@ let cancel_game ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name () =
     ~on_err
 ;;
 
-let vote_team ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name ~mission ~proposal ~vote () =
+let vote_team
+  ?(on_ok = ignore_ok)
+  ?(on_err = ignore_err)
+  ~lobby
+  ~name
+  ~mission
+  ~proposal
+  ~vote
+  ()
+  =
   post
     ~endpoint:"voteTeam"
     ~data:
@@ -110,7 +123,15 @@ let vote_team ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name ~mission 
     ~on_err
 ;;
 
-let start_game ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~player_list ~roles ~in_game_log () =
+let start_game
+  ?(on_ok = ignore_ok)
+  ?(on_err = ignore_err)
+  ~lobby
+  ~player_list
+  ~roles
+  ~in_game_log
+  ()
+  =
   post
     ~endpoint:"startGame"
     ~data:
@@ -123,7 +144,16 @@ let start_game ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~player_list ~
     ~on_err
 ;;
 
-let propose_team ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name ~mission ~proposal ~team () =
+let propose_team
+  ?(on_ok = ignore_ok)
+  ?(on_err = ignore_err)
+  ~lobby
+  ~name
+  ~mission
+  ~proposal
+  ~team
+  ()
+  =
   post
     ~endpoint:"proposeTeam"
     ~data:
@@ -137,7 +167,16 @@ let propose_team ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name ~missi
     ~on_err
 ;;
 
-let do_mission ?(on_ok = ignore_ok) ?(on_err = ignore_err) ~lobby ~name ~mission ~proposal ~vote () =
+let do_mission
+  ?(on_ok = ignore_ok)
+  ?(on_err = ignore_err)
+  ~lobby
+  ~name
+  ~mission
+  ~proposal
+  ~vote
+  ()
+  =
   post
     ~endpoint:"doMission"
     ~data:

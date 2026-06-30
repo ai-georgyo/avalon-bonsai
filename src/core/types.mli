@@ -1,9 +1,8 @@
 open! Core
 
-(** The shared game data model (ported from client/src/types.ts and
-    common/avalonlib.ts). These types are the common vocabulary used across the
-    whole project, so the interface re-exports them with their generated
-    [sexp]/[equal]/[compare] functions. *)
+(** The shared game data model (ported from client/src/types.ts and common/avalonlib.ts).
+    These types are the common vocabulary used across the whole project, so the interface
+    re-exports them with their generated [sexp]/[equal]/[compare] functions. *)
 
 type team =
   | Good

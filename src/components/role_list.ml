@@ -8,20 +8,27 @@ module D = State.Derived
 module N = Vdom.Node
 module A = Vdom.Attr
 
-(** Role lists: the admin-selectable list in the lobby, and the static read-only list shown
-    on the in-game participants tab. Uses only the shared {!Ui} styling. *)
+(** Role lists: the admin-selectable list in the lobby, and the static read-only list
+    shown on the in-game participants tab. Uses only the shared {!Ui} styling. *)
 
 let selectable_role_list (local_ graph) =
   let info, set_info = Bonsai.state_opt graph ~sexp_of_model:[%sexp_of: role] in
   Ui.modal
     info
-    ~on_close:(let%arr set_info = set_info in set_info None)
+    ~on_close:
+      (let%arr set_info in
+       set_info None)
     ~content:(fun (role : role) ~close:_ ->
       div
         ~attrs:[ Ui.overlay_card ]
-        [ card_title ~attrs:[ Ui.title_bar ] [ team_icon role.team; N.h3 [ N.text role.name ] ]; card_text [ N.text role.description ] ])
+        [ card_title
+            ~attrs:[ Ui.title_bar ]
+            [ team_icon role.team; N.h3 [ N.text role.name ] ]
+        ; card_text [ N.text role.description ]
+        ])
     graph;
-  let%arr m = State.value () and set_info = set_info in
+  let%arr m = State.value ()
+  and set_info in
   let allow = D.is_admin m in
   let selected = m.selected_roles in
   let item (role : role) =
@@ -30,11 +37,18 @@ let selectable_role_list (local_ graph) =
       if allow
       then
         N.input
-          ~attrs:[ A.type_ "checkbox"; A.checked_prop is_sel; A.on_click (fun _ -> eff (fun () -> State.toggle_role ~name:role.name ~selected:(not is_sel))) ]
+          ~attrs:
+            [ A.type_ "checkbox"
+            ; A.checked_prop is_sel
+            ; A.on_click (fun _ ->
+                eff (fun () -> State.toggle_role ~name:role.name ~selected:(not is_sel)))
+            ]
           ()
       else N.none
     in
-    let info_btn = btn ~attrs:[ Ui.icon_btn ] ~on_click:(set_info (Some role)) [ mdi "information" ] in
+    let info_btn =
+      btn ~attrs:[ Ui.icon_btn ] ~on_click:(set_info (Some role)) [ mdi "information" ]
+    in
     {%html.jsx|
       <li class="v-list-item">
         <div *{[ Ui.li_prepend ]}>%{checkbox}%{team_icon role.team}</div>

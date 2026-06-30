@@ -7,17 +7,16 @@ module N = Vdom.Node
 
 (** End-game achievement badges, derived from {!Avalon_core.Analysis}. *)
 
-module Style =
-  [%css
-  stylesheet
-    {|
+module Style = [%css stylesheet {|
   .achievement { max-width: 900px; }
 |}]
 
 let achievements (g : Game.t) =
   match Game.outcome g with
   | Some o when not (equal_outcome_state o.state Canceled) ->
-    let badges = Analysis.get_badges (Analysis.create g.data ~role_map:Avalonlib.role_map) in
+    let badges =
+      Analysis.get_badges (Analysis.create g.data ~role_map:Avalonlib.role_map)
+    in
     if List.is_empty badges
     then N.none
     else (

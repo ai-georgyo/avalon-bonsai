@@ -5,14 +5,15 @@ open Js_of_ocaml
 
     The handle types ({!user}, {!document_reference}, {!document_snapshot}, {!error}) are
     abstract and distinct, modeled on the [@firebase/auth] and [@firebase/firestore]
-    TypeScript definitions, so the OCaml type system enforces that e.g. a snapshot can't be
-    passed where a reference is expected, and JS objects are read only through the typed
-    accessors below — never via raw [Js.Unsafe] in callers.
+    TypeScript definitions, so the OCaml type system enforces that e.g. a snapshot can't
+    be passed where a reference is expected, and JS objects are read only through the
+    typed accessors below — never via raw [Js.Unsafe] in callers.
 
-    The modular SDK is shipped as a vendored, esbuild-bundled artifact (see [shim/]) that is
-    embedded into the page bundle via [(js_of_ocaml (javascript_files ...))] and exposes its
-    exports on [globalThis.__fb] — present synchronously, no gstatic CDN, no dynamic [import()].
-    Wrap setup in {!on_ready}, which snapshots that global once before running its callback. *)
+    The modular SDK is shipped as a vendored, esbuild-bundled artifact (see [shim/]) that
+    is embedded into the page bundle via [(js_of_ocaml (javascript_files ...))] and
+    exposes its exports on [globalThis.__fb] — present synchronously, no gstatic CDN, no
+    dynamic [import()]. Wrap setup in {!on_ready}, which snapshots that global once before
+    running its callback. *)
 
 type any = Js.Unsafe.any
 type user = any
@@ -39,7 +40,10 @@ let str = Js.string
 let inject = Js.Unsafe.inject
 
 let is_nullish (v : any) : bool =
-  Js.to_bool (Js.Unsafe.fun_call (Js.Unsafe.js_expr "(function(x){return x===undefined||x===null;})") [| inject v |])
+  Js.to_bool
+    (Js.Unsafe.fun_call
+       (Js.Unsafe.js_expr "(function(x){return x===undefined||x===null;})")
+       [| inject v |])
 ;;
 
 let field_string_opt (o : any) (k : string) : string option =
@@ -50,8 +54,8 @@ let field_string_opt (o : any) (k : string) : string option =
 let field_string ?(default = "") o k = Option.value (field_string_opt o k) ~default
 let to_opt (v : any) : any option = if is_nullish v then None else Some v
 
-(* The merged exports of the modular ESM entry points, populated by {!on_ready} via dynamic
-   import; [call] dispatches a free function by name. *)
+(* The merged exports of the modular ESM entry points, populated by {!on_ready} via
+   dynamic import; [call] dispatches a free function by name. *)
 let exports_ref : any option ref = ref None
 
 let api () : any =
@@ -60,16 +64,28 @@ let api () : any =
   | None -> failwith "Firebase modules are not loaded; run inside Firebase.on_ready"
 ;;
 
-let call (name : string) (args : any array) : any = Js.Unsafe.fun_call (Js.Unsafe.get (api ()) (str name)) args
+let call (name : string) (args : any array) : any =
+  Js.Unsafe.fun_call (Js.Unsafe.get (api ()) (str name)) args
+;;
 
 let promise_then (p : any) ~(on_ok : any -> unit) ~(on_err : error -> unit) : unit =
-  ignore (Js.Unsafe.meth_call p "then" [| inject (Js.wrap_callback on_ok); inject (Js.wrap_callback on_err) |] : any)
+  ignore
+    (Js.Unsafe.meth_call
+       p
+       "then"
+       [| inject (Js.wrap_callback on_ok); inject (Js.wrap_callback on_err) |]
+     : any)
 ;;
 
 (* ---- app (cached default app; auth/firestore handles derived lazily) ---- *)
 
 let app_ref : any option ref = ref None
-let app () : any = match !app_ref with Some a -> a | None -> failwith "Firebase.init has not been called"
+
+let app () : any =
+  match !app_ref with
+  | Some a -> a
+  | None -> failwith "Firebase.init has not been called"
+;;
 
 let init (c : config) : unit =
   let cfg =
@@ -99,18 +115,40 @@ let on_auth_state_changed (cb : user option -> unit) : unit =
 ;;
 
 let sign_in_anonymously ~(on_err : error -> unit) : unit =
-  promise_then (call "signInAnonymously" [| inject (auth ()) |]) ~on_ok:(fun _ -> ()) ~on_err
+  promise_then
+    (call "signInAnonymously" [| inject (auth ()) |])
+    ~on_ok:(fun _ -> ())
+    ~on_err
 ;;
 
-let sign_in_with_email_link ~(email : string) ~(link : string) ~(on_ok : unit -> unit) ~(on_err : error -> unit) : unit =
+let sign_in_with_email_link
+  ~(email : string)
+  ~(link : string)
+  ~(on_ok : unit -> unit)
+  ~(on_err : error -> unit)
+  : unit
+  =
   promise_then
-    (call "signInWithEmailLink" [| inject (auth ()); inject (str email); inject (str link) |])
+    (call
+       "signInWithEmailLink"
+       [| inject (auth ()); inject (str email); inject (str link) |])
     ~on_ok:(fun _ -> on_ok ())
     ~on_err
 ;;
 
-let send_sign_in_link_to_email ~(email : string) ~(settings : action_code_settings) ~(on_ok : unit -> unit) ~(on_err : error -> unit) : unit =
-  let s = Js.Unsafe.obj [| "url", inject (str settings.url); "handleCodeInApp", inject (Js.bool settings.handle_code_in_app) |] in
+let send_sign_in_link_to_email
+  ~(email : string)
+  ~(settings : action_code_settings)
+  ~(on_ok : unit -> unit)
+  ~(on_err : error -> unit)
+  : unit
+  =
+  let s =
+    Js.Unsafe.obj
+      [| "url", inject (str settings.url)
+       ; "handleCodeInApp", inject (Js.bool settings.handle_code_in_app)
+      |]
+  in
   promise_then
     (call "sendSignInLinkToEmail" [| inject (auth ()); inject (str email); inject s |])
     ~on_ok:(fun _ -> on_ok ())
@@ -125,7 +163,13 @@ let uid (u : user) : string = field_string u "uid"
 let email (u : user) : string option = field_string_opt u "email"
 let display_name (u : user) : string option = field_string_opt u "displayName"
 
-let get_id_token (u : user) ~(force_refresh : bool) ~(on_ok : string -> unit) ~(on_err : error -> unit) : unit =
+let get_id_token
+  (u : user)
+  ~(force_refresh : bool)
+  ~(on_ok : string -> unit)
+  ~(on_err : error -> unit)
+  : unit
+  =
   promise_then
     (Js.Unsafe.meth_call u "getIdToken" [| inject (Js.bool force_refresh) |])
     ~on_ok:(fun token -> on_ok (Js.to_string (Js.Unsafe.coerce token)))
@@ -136,15 +180,34 @@ let get_id_token (u : user) ~(force_refresh : bool) ~(on_ok : string -> unit) ~(
 
 (* Modular [doc(db, ...pathSegments)] replaces compat's collection/doc chaining. *)
 let doc (path : string list) : document_reference =
-  call "doc" (Array.of_list (inject (firestore ()) :: List.map path ~f:(fun s -> inject (str s))))
+  call
+    "doc"
+    (Array.of_list (inject (firestore ()) :: List.map path ~f:(fun s -> inject (str s))))
 ;;
 
-let on_snapshot (ref : document_reference) ~(on_next : document_snapshot -> unit) ~(on_error : error -> unit) : unit -> unit =
-  let unsub = call "onSnapshot" [| inject ref; inject (Js.wrap_callback on_next); inject (Js.wrap_callback on_error) |] in
+let on_snapshot
+  (ref : document_reference)
+  ~(on_next : document_snapshot -> unit)
+  ~(on_error : error -> unit)
+  : unit -> unit
+  =
+  let unsub =
+    call
+      "onSnapshot"
+      [| inject ref
+       ; inject (Js.wrap_callback on_next)
+       ; inject (Js.wrap_callback on_error)
+      |]
+  in
   fun () -> ignore (Js.Unsafe.fun_call unsub [||] : any)
 ;;
 
-let get_doc (ref : document_reference) ~(on_ok : document_snapshot -> unit) ~(on_err : error -> unit) : unit =
+let get_doc
+  (ref : document_reference)
+  ~(on_ok : document_snapshot -> unit)
+  ~(on_err : error -> unit)
+  : unit
+  =
   promise_then (call "getDoc" [| inject ref |]) ~on_ok ~on_err
 ;;
 
@@ -152,8 +215,13 @@ let get_doc (ref : document_reference) ~(on_ok : document_snapshot -> unit) ~(on
 
 (* Modular SDK: [exists()] is a METHOD (compat exposed [exists] as a property); [data()]
    returns DocumentData | undefined. *)
-let exists (snap : document_snapshot) : bool = Js.to_bool (Js.Unsafe.coerce (Js.Unsafe.meth_call snap "exists" [||]))
-let data (snap : document_snapshot) : any option = to_opt (Js.Unsafe.meth_call snap "data" [||])
+let exists (snap : document_snapshot) : bool =
+  Js.to_bool (Js.Unsafe.coerce (Js.Unsafe.meth_call snap "exists" [||]))
+;;
+
+let data (snap : document_snapshot) : any option =
+  to_opt (Js.Unsafe.meth_call snap "data" [||])
+;;
 
 (* ---- error ---- *)
 
@@ -166,9 +234,10 @@ let error_code (e : error) : string = field_string e "code"
    firebase/vendor/firebase-shim.js) that is embedded into the page bundle via
    [(js_of_ocaml (javascript_files ...))] in [firebase/dune] — exactly like the
    bonsai_web_components bindings ship their JS. It runs at startup and exposes its named
-   exports on [globalThis.__fb], so they are present synchronously with no gstatic CDN and no
-   runtime dynamic [import()]. [on_ready] simply snapshots that global once and runs [f]; the
-   asynchronous-load API shape is kept so callers (and {!on_error}) are unaffected. *)
+   exports on [globalThis.__fb], so they are present synchronously with no gstatic CDN and
+   no runtime dynamic [import()]. [on_ready] simply snapshots that global once and runs
+   [f]; the asynchronous-load API shape is kept so callers (and {!on_error}) are
+   unaffected. *)
 let on_ready ?(on_error = fun () -> ()) (f : unit -> unit) : unit =
   match !exports_ref with
   | Some _ -> f ()
@@ -179,10 +248,10 @@ let on_ready ?(on_error = fun () -> ()) (f : unit -> unit) : unit =
       ignore
         (Js.Unsafe.fun_call
            (Js.Unsafe.js_expr
-              "(function(){console.error('Firebase SDK bundle missing: globalThis.__fb is not \
-               set (firebase/vendor/firebase-shim.js not embedded?)');})")
+              "(function(){console.error('Firebase SDK bundle missing: globalThis.__fb \
+               is not set (firebase/vendor/firebase-shim.js not embedded?)');})")
            [||]
-          : any);
+         : any);
       on_error ())
     else (
       exports_ref := Some g;

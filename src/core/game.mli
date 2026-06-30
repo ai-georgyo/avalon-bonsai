@@ -1,8 +1,8 @@
 open! Core
 open Types
 
-(** Derived game state computed from {!Types.game_data} plus the role map
-    (port of the [Game] class in client/src/avalon.ts). *)
+(** Derived game state computed from {!Types.game_data} plus the role map (port of the
+    [Game] class in client/src/avalon.ts). *)
 
 type t =
   { data : game_data

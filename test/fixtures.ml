@@ -16,24 +16,54 @@ let roles_assignment : role_assignment list =
   ; { name = "DAVE"; role = "MORGANA"; assassin = false }
   ; { name = "EVE"; role = "ASSASSIN"; assassin = true }
   ]
+;;
 
 let role_names = [ "MERLIN"; "PERCIVAL"; "LOYAL FOLLOWER"; "MORGANA"; "ASSASSIN" ]
-let approved (proposer : string) (team : string list) : proposal = { proposer; team; votes = players; state = Approved }
-let pending (proposer : string) : proposal = { proposer; team = []; votes = []; state = Pending }
-let rejected (proposer : string) (team : string list) : proposal = { proposer; team; votes = []; state = Rejected }
-let all_true (team : string list) : bool String.Map.t = String.Map.of_alist_exn (List.map team ~f:(fun n -> n, true))
+
+let approved (proposer : string) (team : string list) : proposal =
+  { proposer; team; votes = players; state = Approved }
+;;
+
+let pending (proposer : string) : proposal =
+  { proposer; team = []; votes = []; state = Pending }
+;;
+
+let rejected (proposer : string) (team : string list) : proposal =
+  { proposer; team; votes = []; state = Rejected }
+;;
+
+let all_true (team : string list) : bool String.Map.t =
+  String.Map.of_alist_exn (List.map team ~f:(fun n -> n, true))
+;;
 
 let success ~size ~team ~proposer : mission =
-  { state = Success; team; team_size = size; fails_required = 1; num_fails = 0; proposals = [ approved proposer team ] }
+  { state = Success
+  ; team
+  ; team_size = size
+  ; fails_required = 1
+  ; num_fails = 0
+  ; proposals = [ approved proposer team ]
+  }
+;;
 
 let pending_mission ~size : mission =
-  { state = M_pending; team = []; team_size = size; fails_required = 1; num_fails = 0; proposals = [] }
+  { state = M_pending
+  ; team = []
+  ; team_size = size
+  ; fails_required = 1
+  ; num_fails = 0
+  ; proposals = []
+  }
+;;
 
 (* A completed good win in which evil was never sent on a mission (good teams only). *)
 let good_win : game_data =
   let mission_votes =
     let all_true team = String.Map.of_alist_exn (List.map team ~f:(fun n -> n, true)) in
-    [ all_true [ "ALICE"; "BOB" ]; all_true [ "ALICE"; "BOB"; "CARL" ]; all_true [ "ALICE"; "BOB" ] ]
+    [ all_true [ "ALICE"; "BOB" ]
+    ; all_true [ "ALICE"; "BOB"; "CARL" ]
+    ; all_true [ "ALICE"; "BOB" ]
+    ]
   in
   { state = Game_ended
   ; phase = "GOOD_WIN"
@@ -46,23 +76,41 @@ let good_win : game_data =
       ; pending_mission ~size:3
       ; pending_mission ~size:3
       ]
-  ; outcome = Some { state = Good_win; message = "Good wins!"; assassinated = None; roles = roles_assignment; votes = mission_votes }
+  ; outcome =
+      Some
+        { state = Good_win
+        ; message = "Good wins!"
+        ; assassinated = None
+        ; roles = roles_assignment
+        ; votes = mission_votes
+        }
   ; in_game_log = false
   }
+;;
 
 (* A completed EVIL win by assassination: good ran 3 successful missions (evil rode along
    without failing), then the assassin (EVE) correctly killed Merlin (ALICE). Includes a
    couple of rejected proposals so rejection/curse detectors have data. *)
 let evil_win : game_data =
   let m1 : mission =
-    { state = Success; team = [ "ALICE"; "BOB" ]; team_size = 2; fails_required = 1; num_fails = 0
-    ; proposals = [ rejected "DAVE" [ "DAVE"; "EVE" ]; approved "ALICE" [ "ALICE"; "BOB" ] ]
+    { state = Success
+    ; team = [ "ALICE"; "BOB" ]
+    ; team_size = 2
+    ; fails_required = 1
+    ; num_fails = 0
+    ; proposals =
+        [ rejected "DAVE" [ "DAVE"; "EVE" ]; approved "ALICE" [ "ALICE"; "BOB" ] ]
     }
   in
   let m2 = success ~size:3 ~team:[ "BOB"; "CARL"; "DAVE" ] ~proposer:"BOB" in
   let m3 : mission =
-    { state = Success; team = [ "ALICE"; "DAVE" ]; team_size = 2; fails_required = 1; num_fails = 0
-    ; proposals = [ rejected "EVE" [ "DAVE"; "EVE" ]; approved "CARL" [ "ALICE"; "DAVE" ] ]
+    { state = Success
+    ; team = [ "ALICE"; "DAVE" ]
+    ; team_size = 2
+    ; fails_required = 1
+    ; num_fails = 0
+    ; proposals =
+        [ rejected "EVE" [ "DAVE"; "EVE" ]; approved "CARL" [ "ALICE"; "DAVE" ] ]
     }
   in
   { state = Game_ended
@@ -76,31 +124,60 @@ let evil_win : game_data =
         ; message = "Evil wins!"
         ; assassinated = Some "ALICE"
         ; roles = roles_assignment
-        ; votes = [ all_true [ "ALICE"; "BOB" ]; all_true [ "BOB"; "CARL"; "DAVE" ]; all_true [ "ALICE"; "DAVE" ] ]
+        ; votes =
+            [ all_true [ "ALICE"; "BOB" ]
+            ; all_true [ "BOB"; "CARL"; "DAVE" ]
+            ; all_true [ "ALICE"; "DAVE" ]
+            ]
         }
   ; in_game_log = false
   }
+;;
 
 (* A completed good win contrived so two proposers (ALICE, BOB) each have exactly two
    "perfect" (all-good) proposals and no bad ones — a TIE. The "Actual Merlin" badge must
-   deterministically name the earliest-seated of the two (ALICE). Guards the psychic_powers
-   tie-break. *)
+   deterministically name the earliest-seated of the two (ALICE). Guards the
+   psychic_powers tie-break. *)
 let psychic_tie : game_data =
-  let m ~proposals : mission = { state = Success; team = [ "ALICE"; "BOB" ]; team_size = 2; fails_required = 1; num_fails = 0; proposals } in
+  let m ~proposals : mission =
+    { state = Success
+    ; team = [ "ALICE"; "BOB" ]
+    ; team_size = 2
+    ; fails_required = 1
+    ; num_fails = 0
+    ; proposals
+    }
+  in
   { state = Game_ended
   ; phase = "GOOD_WIN"
   ; players
   ; roles = role_names
   ; missions =
-      [ m ~proposals:[ rejected "ALICE" [ "ALICE"; "CARL" ]; approved "ALICE" [ "ALICE"; "BOB" ] ]
-      ; m ~proposals:[ rejected "BOB" [ "BOB"; "CARL" ]; approved "BOB" [ "ALICE"; "BOB" ] ]
+      [ m
+          ~proposals:
+            [ rejected "ALICE" [ "ALICE"; "CARL" ]; approved "ALICE" [ "ALICE"; "BOB" ] ]
+      ; m
+          ~proposals:
+            [ rejected "BOB" [ "BOB"; "CARL" ]; approved "BOB" [ "ALICE"; "BOB" ] ]
       ; m ~proposals:[ approved "CARL" [ "ALICE"; "BOB" ] ]
       ; pending_mission ~size:3
       ; pending_mission ~size:3
       ]
-  ; outcome = Some { state = Good_win; message = "Good wins!"; assassinated = None; roles = roles_assignment; votes = [ all_true [ "ALICE"; "BOB" ]; all_true [ "ALICE"; "BOB" ]; all_true [ "ALICE"; "BOB" ] ] }
+  ; outcome =
+      Some
+        { state = Good_win
+        ; message = "Good wins!"
+        ; assassinated = None
+        ; roles = roles_assignment
+        ; votes =
+            [ all_true [ "ALICE"; "BOB" ]
+            ; all_true [ "ALICE"; "BOB" ]
+            ; all_true [ "ALICE"; "BOB" ]
+            ]
+        }
   ; in_game_log = false
   }
+;;
 
 (* An in-progress game: mission 1, first proposal pending, proposed by ALICE. *)
 let mid_game : game_data =
@@ -109,8 +186,16 @@ let mid_game : game_data =
   ; players
   ; roles = role_names
   ; missions =
-      ({ state = M_pending; team = []; team_size = 2; fails_required = 1; num_fails = 0; proposals = [ pending "ALICE" ] } : mission)
+      ({ state = M_pending
+       ; team = []
+       ; team_size = 2
+       ; fails_required = 1
+       ; num_fails = 0
+       ; proposals = [ pending "ALICE" ]
+       }
+       : mission)
       :: List.map [ 3; 2; 3; 3 ] ~f:(fun size -> pending_mission ~size)
   ; outcome = None
   ; in_game_log = false
   }
+;;

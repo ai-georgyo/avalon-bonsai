@@ -37,9 +37,9 @@ type action_code_settings =
   ; handle_code_in_app : bool
   }
 
-(** Run [f] once the modular SDK is loaded (immediately if already loaded). [on_error] runs
-    if the dynamic import fails (e.g. the CDN is blocked or offline) so the caller can show a
-    recoverable error instead of hanging. *)
+(** Run [f] once the modular SDK is loaded (immediately if already loaded). [on_error]
+    runs if the dynamic import fails (e.g. the CDN is blocked or offline) so the caller
+    can show a recoverable error instead of hanging. *)
 val on_ready : ?on_error:(unit -> unit) -> (unit -> unit) -> unit
 
 (** [initializeApp] the default app. Must run before any other call; do it in {!on_ready}. *)
@@ -49,15 +49,34 @@ val init : config -> unit
 val current_user : unit -> user option
 val on_auth_state_changed : (user option -> unit) -> unit
 val sign_in_anonymously : on_err:(error -> unit) -> unit
-val sign_in_with_email_link : email:string -> link:string -> on_ok:(unit -> unit) -> on_err:(error -> unit) -> unit
-val send_sign_in_link_to_email : email:string -> settings:action_code_settings -> on_ok:(unit -> unit) -> on_err:(error -> unit) -> unit
+
+val sign_in_with_email_link
+  :  email:string
+  -> link:string
+  -> on_ok:(unit -> unit)
+  -> on_err:(error -> unit)
+  -> unit
+
+val send_sign_in_link_to_email
+  :  email:string
+  -> settings:action_code_settings
+  -> on_ok:(unit -> unit)
+  -> on_err:(error -> unit)
+  -> unit
+
 val sign_out : unit -> unit
 
 (* ---- user ---- *)
 val uid : user -> string
 val email : user -> string option
 val display_name : user -> string option
-val get_id_token : user -> force_refresh:bool -> on_ok:(string -> unit) -> on_err:(error -> unit) -> unit
+
+val get_id_token
+  :  user
+  -> force_refresh:bool
+  -> on_ok:(string -> unit)
+  -> on_err:(error -> unit)
+  -> unit
 
 (* ---- firestore ---- *)
 
@@ -65,14 +84,24 @@ val get_id_token : user -> force_refresh:bool -> on_ok:(string -> unit) -> on_er
 val doc : string list -> document_reference
 
 (** Subscribe to realtime updates; returns the unsubscribe thunk. *)
-val on_snapshot : document_reference -> on_next:(document_snapshot -> unit) -> on_error:(error -> unit) -> unit -> unit
+val on_snapshot
+  :  document_reference
+  -> on_next:(document_snapshot -> unit)
+  -> on_error:(error -> unit)
+  -> unit
+  -> unit
 
-val get_doc : document_reference -> on_ok:(document_snapshot -> unit) -> on_err:(error -> unit) -> unit
+val get_doc
+  :  document_reference
+  -> on_ok:(document_snapshot -> unit)
+  -> on_err:(error -> unit)
+  -> unit
 
 (* ---- document snapshot ---- *)
 val exists : document_snapshot -> bool
 
-(** The document's data as a raw JS object (for the avalon [Parse] module), or [None] if it doesn't exist. *)
+(** The document's data as a raw JS object (for the avalon [Parse] module), or [None] if
+    it doesn't exist. *)
 val data : document_snapshot -> Js.Unsafe.any option
 
 (* ---- error ---- *)

@@ -18,18 +18,32 @@ module Style =
 
 let stats_display (stats : stats option) (global : stats option) =
   let s = Option.value stats ~default:empty_stats in
-  let games = s.games and good = s.good and wins = s.wins and good_wins = s.good_wins in
+  let games = s.games
+  and good = s.good
+  and wins = s.wins
+  and good_wins = s.good_wins in
   let evil = games - good in
   let evil_wins = wins - good_wins in
-  let pct n d = if d > 0 then sprintf "%d%%" (Float.to_int (100. *. Float.of_int n /. Float.of_int d)) else "N/A" in
+  let pct n d =
+    if d > 0
+    then sprintf "%d%%" (Float.to_int (100. *. Float.of_int n /. Float.of_int d))
+    else "N/A"
+  in
   let row label a b c =
-    N.tr [ N.td ~attrs:[ Ui.fw ] [ N.text label ]; N.td [ N.text a ]; N.td [ N.text b ]; N.td [ N.text c ] ]
+    N.tr
+      [ N.td ~attrs:[ Ui.fw ] [ N.text label ]
+      ; N.td [ N.text a ]
+      ; N.td [ N.text b ]
+      ; N.td [ N.text c ]
+      ]
   in
   let playtime =
     let secs = s.playtime_seconds in
     let hours = Float.of_int secs /. 60. /. 60. in
-    if Float.(hours > 1.) then sprintf "%.1f hours" hours
-    else if secs > 60 then sprintf "%d minutes" (secs / 60)
+    if Float.(hours > 1.)
+    then sprintf "%.1f hours" hours
+    else if secs > 60
+    then sprintf "%d minutes" (secs / 60)
     else "Not enough"
   in
   let global_rows =
@@ -46,11 +60,27 @@ let stats_display (stats : stats option) (global : stats option) =
   in
   let table =
     N.table
-      [ N.thead [ N.tr ~attrs:[ Style.stats_header ] [ N.td []; N.td [ N.text "Good" ]; N.td [ N.text "Evil" ]; N.td [ N.text "Total" ] ] ]
+      [ N.thead
+          [ N.tr
+              ~attrs:[ Style.stats_header ]
+              [ N.td []
+              ; N.td [ N.text "Good" ]
+              ; N.td [ N.text "Evil" ]
+              ; N.td [ N.text "Total" ]
+              ]
+          ]
       ; N.tbody
           ([ row "Games" (Int.to_string good) (Int.to_string evil) (Int.to_string games)
-           ; row "Wins" (Int.to_string good_wins) (Int.to_string evil_wins) (Int.to_string wins)
-           ; row "Losses" (Int.to_string (good - good_wins)) (Int.to_string (evil - evil_wins)) (Int.to_string (games - wins))
+           ; row
+               "Wins"
+               (Int.to_string good_wins)
+               (Int.to_string evil_wins)
+               (Int.to_string wins)
+           ; row
+               "Losses"
+               (Int.to_string (good - good_wins))
+               (Int.to_string (evil - evil_wins))
+               (Int.to_string (games - wins))
            ; row "Win Rate" (pct good_wins good) (pct evil_wins evil) (pct wins games)
            ]
            @ global_rows)

@@ -1,8 +1,7 @@
 open! Core
 
-(** Game data model, ported from client/src/types.ts and common/avalonlib.ts.
-    All values are immutable; "selected" role state lives in {!State.Model}, not on
-    the role records. *)
+(** Game data model, ported from client/src/types.ts and common/avalonlib.ts. All values
+    are immutable; "selected" role state lives in {!State.Model}, not on the role records. *)
 
 type team =
   | Good

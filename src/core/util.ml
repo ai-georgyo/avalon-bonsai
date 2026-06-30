@@ -1,7 +1,7 @@
 open! Core
 
-(** Port of the [Array.prototype.joinWithAnd] helper from the original client:
-    [] -> "", [a] -> "a", [a;b] -> "a and b", [a;b;c] -> "a, b and c". *)
+(** Port of the [Array.prototype.joinWithAnd] helper from the original client: [] -> "",
+    [a] -> "a", [a;b] -> "a and b", [a;b;c] -> "a, b and c". *)
 let join_with_and (items : string list) : string =
   match items with
   | [] -> ""

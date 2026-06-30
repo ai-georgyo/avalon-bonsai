@@ -5,11 +5,42 @@ open! Core
     response; [on_err] receives an error message. *)
 
 val login : ?on_ok:(Ffi.any -> unit) -> ?on_err:(string -> unit) -> string option -> unit
-val join_lobby : on_ok:(Ffi.any -> unit) -> on_err:(string -> unit) -> name:string -> lobby:string -> unit
-val create_lobby : on_ok:(Ffi.any -> unit) -> on_err:(string -> unit) -> name:string -> unit
-val leave_lobby : ?on_ok:(Ffi.any -> unit) -> ?on_err:(string -> unit) -> lobby:string -> unit -> unit
-val kick_player : ?on_ok:(Ffi.any -> unit) -> ?on_err:(string -> unit) -> lobby:string -> name:string -> unit -> unit
-val cancel_game : ?on_ok:(Ffi.any -> unit) -> ?on_err:(string -> unit) -> lobby:string -> name:string -> unit -> unit
+
+val join_lobby
+  :  on_ok:(Ffi.any -> unit)
+  -> on_err:(string -> unit)
+  -> name:string
+  -> lobby:string
+  -> unit
+
+val create_lobby
+  :  on_ok:(Ffi.any -> unit)
+  -> on_err:(string -> unit)
+  -> name:string
+  -> unit
+
+val leave_lobby
+  :  ?on_ok:(Ffi.any -> unit)
+  -> ?on_err:(string -> unit)
+  -> lobby:string
+  -> unit
+  -> unit
+
+val kick_player
+  :  ?on_ok:(Ffi.any -> unit)
+  -> ?on_err:(string -> unit)
+  -> lobby:string
+  -> name:string
+  -> unit
+  -> unit
+
+val cancel_game
+  :  ?on_ok:(Ffi.any -> unit)
+  -> ?on_err:(string -> unit)
+  -> lobby:string
+  -> name:string
+  -> unit
+  -> unit
 
 val vote_team
   :  ?on_ok:(Ffi.any -> unit)

@@ -22,16 +22,31 @@ module Style =
   .mission_result { border-right: 2px solid; }
 |}]
 
-let mission_summary_table ~players ~(missions : mission list) ~(roles : role_assignment list option) ~(mission_votes : bool String.Map.t list option) =
-  let proposals_of (m : mission) = List.filter m.proposals ~f:(fun p -> not (List.is_empty p.team)) in
+let mission_summary_table
+  ~players
+  ~(missions : mission list)
+  ~(roles : role_assignment list option)
+  ~(mission_votes : bool String.Map.t list option)
+  =
+  let proposals_of (m : mission) =
+    List.filter m.proposals ~f:(fun p -> not (List.is_empty p.team))
+  in
   let cell_for player (proposal : proposal) =
     fa_layers
       (List.filter_opt
-         [ (if String.equal proposal.proposer player then Some (fa ~color:"gold" "fas" "fa-circle") else None)
-         ; (if List.mem proposal.team player ~equal:String.equal then Some (fa ~color:"#629ec1" "far" "fa-circle") else None)
+         [ (if String.equal proposal.proposer player
+            then Some (fa ~color:"gold" "fas" "fa-circle")
+            else None)
+         ; (if List.mem proposal.team player ~equal:String.equal
+            then Some (fa ~color:"#629ec1" "far" "fa-circle")
+            else None)
          ; (match proposal.state with
             | Pending -> None
-            | _ -> Some (if List.mem proposal.votes player ~equal:String.equal then fa ~color:"green" "far" "fa-thumbs-up" else fa ~color:"#ed1515" "far" "fa-thumbs-down"))
+            | _ ->
+              Some
+                (if List.mem proposal.votes player ~equal:String.equal
+                 then fa ~color:"green" "far" "fa-thumbs-up"
+                 else fa ~color:"#ed1515" "far" "fa-thumbs-down"))
          ])
   in
   let row player =
@@ -39,25 +54,41 @@ let mission_summary_table ~players ~(missions : mission list) ~(roles : role_ass
       match roles with
       | Some rs ->
         let r = List.find rs ~f:(fun r -> String.equal r.name player) in
-        [ N.td ~attrs:[ Style.role_cell ] [ N.text (Option.value_map r ~default:"" ~f:(fun r -> r.role)) ] ]
+        [ N.td
+            ~attrs:[ Style.role_cell ]
+            [ N.text (Option.value_map r ~default:"" ~f:(fun r -> r.role)) ]
+        ]
       | None -> []
     in
     let mission_cells =
       List.concat_mapi missions ~f:(fun midx m ->
-        let prop_cells = List.map (proposals_of m) ~f:(fun p -> N.td [ cell_for player p ]) in
+        let prop_cells =
+          List.map (proposals_of m) ~f:(fun p -> N.td [ cell_for player p ])
+        in
         let result_cell =
           match mission_votes with
           | Some mv ->
             if List.mem m.team player ~equal:String.equal
             then (
-              let v = Option.bind (List.nth mv midx) ~f:(fun map -> Map.find map player) in
-              [ N.td ~attrs:[ Style.mission_result ] [ (match v with Some true -> fa ~color:"green" "fas" "fa-check-circle" | _ -> fa ~color:"red" "fas" "fa-times-circle") ] ])
+              let v =
+                Option.bind (List.nth mv midx) ~f:(fun map -> Map.find map player)
+              in
+              [ N.td
+                  ~attrs:[ Style.mission_result ]
+                  [ (match v with
+                     | Some true -> fa ~color:"green" "fas" "fa-check-circle"
+                     | _ -> fa ~color:"red" "fas" "fa-times-circle")
+                  ]
+              ])
             else [ N.td ~attrs:[ Style.mission_result ] [] ]
           | None -> []
         in
         prop_cells @ result_cell)
     in
-    N.tr ([ N.td ~attrs:[ Style.player_name ] [ spanc ~attrs:[ Ui.fw ] [ N.text player ] ] ] @ role_cell @ mission_cells)
+    N.tr
+      ([ N.td ~attrs:[ Style.player_name ] [ spanc ~attrs:[ Ui.fw ] [ N.text player ] ] ]
+       @ role_cell
+       @ mission_cells)
   in
   N.table ~attrs:[ Style.summary_table ] (List.map players ~f:row)
 ;;

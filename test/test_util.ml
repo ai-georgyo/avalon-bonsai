@@ -6,12 +6,15 @@ let lines l = String.concat ~sep:"\n" l
 let%test_unit "join_with_and covers 0..4 elements" =
   let j = Util.join_with_and in
   [%test_result: string]
-    (lines [ j []; j [ "A" ]; j [ "A"; "B" ]; j [ "A"; "B"; "C" ]; j [ "A"; "B"; "C"; "D" ] ])
+    (lines
+       [ j []; j [ "A" ]; j [ "A"; "B" ]; j [ "A"; "B"; "C" ]; j [ "A"; "B"; "C"; "D" ] ])
     ~expect:(lines [ ""; "A"; "A and B"; "A, B and C"; "A, B, C and D" ])
 ;;
 
 let%test_unit "difference keeps order and drops present elements" =
-  [%test_result: string list] (Util.difference [ "A"; "B"; "C"; "D" ] [ "B"; "D" ]) ~expect:[ "A"; "C" ];
+  [%test_result: string list]
+    (Util.difference [ "A"; "B"; "C"; "D" ] [ "B"; "D" ])
+    ~expect:[ "A"; "C" ];
   [%test_result: string list] (Util.difference [ "A"; "B" ] []) ~expect:[ "A"; "B" ];
   [%test_result: string list] (Util.difference [] [ "A" ]) ~expect:[]
 ;;
@@ -37,9 +40,17 @@ let%test_unit "string parsers map known and unknown tokens" =
     actual
     ~expect:
       (lines
-         [ "Approved"; "Rejected"; "Pending"
-         ; "Success"; "Fail"; "M_pending"
-         ; "Good_win"; "Evil_win"; "Canceled"
-         ; "Active"; "Game_ended"; "Init"
+         [ "Approved"
+         ; "Rejected"
+         ; "Pending"
+         ; "Success"
+         ; "Fail"
+         ; "M_pending"
+         ; "Good_win"
+         ; "Evil_win"
+         ; "Canceled"
+         ; "Active"
+         ; "Game_ended"
+         ; "Init"
          ])
 ;;

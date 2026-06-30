@@ -28,46 +28,77 @@ let user_login (local_ graph) =
   let submitting, set_submitting = Bonsai.state false graph in
   let submitted, set_submitted = Bonsai.state false graph in
   let%arr m = State.value ()
-  and tab = tab and set_tab = set_tab
-  and email = email and set_email = set_email
-  and error = error and set_error = set_error
-  and submitting = submitting and set_submitting = set_submitting
-  and submitted = submitted and set_submitted = set_submitted in
+  and tab
+  and set_tab
+  and email
+  and set_email
+  and error
+  and set_error
+  and submitting
+  and set_submitting
+  and submitted
+  and set_submitted in
   let submit_email =
     eff (fun () ->
       run (set_submitting true);
       run (set_error "");
-      State.submit_email_addr email
-        ~on_ok:(fun () -> run (set_submitted true); run (set_submitting false))
-        ~on_err:(fun e -> run (set_error e); run (set_submitting false)))
+      State.submit_email_addr
+        email
+        ~on_ok:(fun () ->
+          run (set_submitted true);
+          run (set_submitting false))
+        ~on_err:(fun e ->
+          run (set_error e);
+          run (set_submitting false)))
   in
-  let anon = eff (fun () -> run (set_error ""); State.sign_in_anonymously ~on_err:(fun e -> run (set_error e)) ()) in
+  let anon =
+    eff (fun () ->
+      run (set_error "");
+      State.sign_in_anonymously ~on_err:(fun e -> run (set_error e)) ())
+  in
   let field_err = error_text error in
   let alert =
     match m.confirming_email_error with
-    | Some e -> {%html.jsx|<div *{[ Style.alert_error ]}>%{textf "%s Please try logging in again." e}</div>|}
+    | Some e ->
+      {%html.jsx|<div *{[ Style.alert_error ]}>%{textf "%s Please try logging in again." e}</div>|}
     | None -> N.none
   in
   let tab_button value lbl =
-    btn ~attrs:(if String.equal tab value then [ Ui.tab; Ui.tab_active ] else [ Ui.tab ]) ~on_click:(set_tab value) [ N.text lbl ]
+    btn
+      ~attrs:(if String.equal tab value then [ Ui.tab; Ui.tab_active ] else [ Ui.tab ])
+      ~on_click:(set_tab value)
+      [ N.text lbl ]
   in
   let email_pane =
     if not submitted
     then
       div
         ~attrs:[ Ui.pa_4; Style.login_form ]
-        [ text_field ~typ:"email" ~placeholder:"Email Address" ~value:email ~on_input:set_email ~extra:[ on_enter submit_email ] ()
+        [ text_field
+            ~typ:"email"
+            ~placeholder:"Email Address"
+            ~value:email
+            ~on_input:set_email
+            ~extra:[ on_enter submit_email ]
+            ()
         ; field_err
         ; btn ~loading:submitting ~on_click:submit_email [ N.text "Login" ]
         ]
     else
       div
         ~attrs:[ Ui.pa_4; Style.login_form ]
-        [ card ~attrs:[ Ui.info_card ] [ card_text ~attrs:[ Ui.center ] [ N.p [ N.text "Check your email for the verification link" ] ] ]
+        [ card
+            ~attrs:[ Ui.info_card ]
+            [ card_text
+                ~attrs:[ Ui.center ]
+                [ N.p [ N.text "Check your email for the verification link" ] ]
+            ]
         ; btn ~attrs:[ Ui.mt_4 ] ~on_click:(set_submitted false) [ N.text "Try Again" ]
         ]
   in
-  let anon_pane = div ~attrs:[ Ui.pa_4 ] [ btn ~on_click:anon [ N.text "Login" ]; field_err ] in
+  let anon_pane =
+    div ~attrs:[ Ui.pa_4 ] [ btn ~on_click:anon [ N.text "Login" ]; field_err ]
+  in
   let heading =
     {%html.jsx|<span *{[ Style.welcome_heading ]}>Avalon: The Resistance <span *{[ Ui.thin ]}>Online</span></span>|}
   in
@@ -87,5 +118,6 @@ let user_login (local_ graph) =
           %{if String.equal tab "email" then email_pane else anon_pane}
           %{feedback_link "Email"}
         </div>
-      |} ]
+      |}
+    ]
 ;;

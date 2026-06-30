@@ -3,9 +3,9 @@ open Avalon_core
 open Types
 
 (** The application store: an immutable {!Model.t} snapshot in a single
-    [Bonsai.Expert.Var], updated imperatively by the Firebase listeners, plus the
-    derived predicates and the UI-invoked actions. Internals (the Var, the Firebase
-    subscription bookkeeping, the transition logic) are private. *)
+    [Bonsai.Expert.Var], updated imperatively by the Firebase listeners, plus the derived
+    predicates and the UI-invoked actions. Internals (the Var, the Firebase subscription
+    bookkeeping, the transition logic) are private. *)
 
 module Model : sig
   type modal =
@@ -62,19 +62,50 @@ val value : unit -> Model.t Bonsai.t
 val init : unit -> unit
 
 (* actions invoked by the UI; [on_ok]/[on_err] default to no-ops *)
-val create_lobby : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> name:string -> unit -> unit
-val join_lobby : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> name:string -> lobby:string -> unit -> unit
+val create_lobby
+  :  ?on_ok:(unit -> unit)
+  -> ?on_err:(string -> unit)
+  -> name:string
+  -> unit
+  -> unit
+
+val join_lobby
+  :  ?on_ok:(unit -> unit)
+  -> ?on_err:(string -> unit)
+  -> name:string
+  -> lobby:string
+  -> unit
+  -> unit
+
 val leave_lobby : unit -> unit
 val kick_player : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> string -> unit
 val cancel_game : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> unit -> unit
 val vote_team : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> bool -> unit
-val start_game : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> in_game_log:bool -> unit -> unit
-val propose_team : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> string list -> unit
+
+val start_game
+  :  ?on_ok:(unit -> unit)
+  -> ?on_err:(string -> unit)
+  -> in_game_log:bool
+  -> unit
+  -> unit
+
+val propose_team
+  :  ?on_ok:(unit -> unit)
+  -> ?on_err:(string -> unit)
+  -> string list
+  -> unit
+
 val do_mission : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> bool -> unit
 val assassinate : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> string -> unit
 val logout : unit -> unit
 val sign_in_anonymously : ?on_err:(string -> unit) -> unit -> unit
-val submit_email_addr : ?on_ok:(unit -> unit) -> ?on_err:(string -> unit) -> string -> unit
+
+val submit_email_addr
+  :  ?on_ok:(unit -> unit)
+  -> ?on_err:(string -> unit)
+  -> string
+  -> unit
+
 val toggle_role : name:string -> selected:bool -> unit
 val set_modal : Model.modal -> unit
 val set_show_role_sheet : bool -> unit

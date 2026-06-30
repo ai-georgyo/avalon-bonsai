@@ -68,7 +68,8 @@ let roles : role list =
   ; { name = "EVIL MINION"
     ; team = Evil
     ; sees = [ "MORGANA"; "MORDRED"; "ASSASSIN"; "EVIL MINION" ]
-    ; description = "Evil Minion is pretty evil. He can see other evil people (except Oberon)"
+    ; description =
+        "Evil Minion is pretty evil. He can see other evil people (except Oberon)"
     ; selectable = false
     ; filler = true
     ; default_selected = false

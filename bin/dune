@@ -6,7 +6,8 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
  (js_of_ocaml
-  (flags (--effects cps))
+  (flags
+   (--effects cps))
   (javascript_files runtime_avalon.js))
  (modes js))
 

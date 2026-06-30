@@ -36,7 +36,10 @@ let to_list (v : any) : any list =
 let keys (obj : any) : string list =
   if is_nullish obj
   then []
-  else List.map (Array.to_list (Js.to_array (Js.object_keys (Js.Unsafe.coerce obj)))) ~f:Js.to_string
+  else
+    List.map
+      (Array.to_list (Js.to_array (Js.object_keys (Js.Unsafe.coerce obj))))
+      ~f:Js.to_string
 ;;
 
 let field_string ?(default = "") obj key =
@@ -100,7 +103,6 @@ let fetch ?opts (url : string) ~(on_ok : any -> unit) ~(on_err : any -> unit) : 
 
 let window = Dom_html.window
 let location = window##.location
-
 let window_origin () : string = Js.to_string location##.origin
 let window_href () : string = Js.to_string location##.href
 let window_pathname () : string = Js.to_string location##.pathname
@@ -115,5 +117,10 @@ let reload_page () : unit = ignore (Js.Unsafe.meth_call location "reload" [||] :
 
 (* GET arguments of the current URL, decoded — [Url.Current.arguments] replaces a manual
    URLSearchParams construction. *)
-let url_has_param (name : string) : bool = List.Assoc.mem Url.Current.arguments name ~equal:String.equal
-let url_get_param (name : string) : string option = List.Assoc.find Url.Current.arguments name ~equal:String.equal
+let url_has_param (name : string) : bool =
+  List.Assoc.mem Url.Current.arguments name ~equal:String.equal
+;;
+
+let url_get_param (name : string) : string option =
+  List.Assoc.find Url.Current.arguments name ~equal:String.equal
+;;

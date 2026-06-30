@@ -142,11 +142,12 @@ let lobby_name () =
 ;;
 
 let user_name_str () = Derived.user_name (model ())
-
 let cur_game () : Game.t option = Derived.game (model ())
 
 (* ---- player list / role config (port of GameConfig) ---- *)
-let update_player_list ~(users : (string * lobby_user) list) ~notify (m : Model.t) : Model.t =
+let update_player_list ~(users : (string * lobby_user) list) ~notify (m : Model.t)
+  : Model.t
+  =
   let name_list = List.map users ~f:(fun (_, u) -> u.name) in
   if List.is_empty m.player_list
   then { m with player_list = name_list }
@@ -176,7 +177,11 @@ let unsubscribe_from_lobby () =
 ;;
 
 let role_doc_updated snap =
-  let rd = match Firebase.data snap with Some d -> Parse.role_doc d | None -> None in
+  let rd =
+    match Firebase.data snap with
+    | Some d -> Parse.role_doc d
+    | None -> None
+  in
   update_lobby ~f:(fun l -> { l with role = rd })
 ;;
 
@@ -188,83 +193,86 @@ let lobby_doc_updated snap =
     (match Firebase.data snap with
      | None -> unsubscribe_from_lobby () (* lobby deleted *)
      | Some snap_data ->
-      let new_data = Parse.lobby_data snap_data in
-      let game = Game.create new_data.game ~role_map:Avalonlib.role_map in
-      let old_data = lob.data in
-      let base =
-        { m with Model.lobby = Some { lob with data = Some new_data; game = Some game } }
-      in
-      let connected_case (m : Model.t) =
-        let m =
-          { m with Model.lobby = Option.map m.lobby ~f:(fun l -> { l with connected = true }) }
-        in
-        let m = update_player_list ~users:new_data.users ~notify:false m in
-        let m =
-          if List.is_empty new_data.game.roles
-          then m
-          else update_roles ~roles:new_data.game.roles m
-        in
-        Ffi.set_document_title (sprintf "Avalon - %s - %s" lob.name (Derived.user_name m));
-        m
-      in
-      let final =
-        match old_data with
-        | None -> connected_case base
-        | Some old when not (String.equal old.name new_data.name) -> connected_case base
-        | Some old ->
-          let m = ref base in
-          if not (String.equal old.admin.uid new_data.admin.uid)
-          then (
-            let is_admin =
-              match (!m).user with
-              | Some u -> String.equal u.uid new_data.admin.uid
-              | None -> false
-            in
-            Toast.show
-              (if is_admin
-               then "You are now lobby administrator"
-               else sprintf "%s became lobby administrator" new_data.admin.name));
-          let old_keys = List.map old.users ~f:fst in
-          let new_keys = String.Set.of_list (List.map new_data.users ~f:fst) in
-          let users_changed =
-            List.length old.users <> List.length new_data.users
-            || not (List.for_all old_keys ~f:(Set.mem new_keys))
-          in
-          if users_changed
-          then m := update_player_list ~users:new_data.users ~notify:true !m;
-          if not (equal_game_state old.game.state new_data.game.state)
-          then
-            if equal_game_state new_data.game.state Active
-            then (
-              m := update_roles ~roles:new_data.game.roles !m;
-              m := { !m with modal = Start_game })
-            else m := { !m with modal = End_game; show_role_sheet = false }
-          else if not (String.equal old.game.phase new_data.game.phase)
-          then (
-            let phase = new_data.game.phase in
-            if String.equal phase "TEAM_PROPOSAL"
-            then
-              if game.current_proposal_idx > 0
-              then (
-                match Game.last_proposal game with
-                | Some p -> Toast.show (sprintf "%s's team rejected" p.proposer)
-                | None -> ())
-              else m := { !m with modal = Mission_result }
-            else if String.equal phase "ASSASSINATION"
-            then m := { !m with modal = Mission_result }
-            else if String.equal phase "MISSION_VOTE"
-            then (
-              match game.current_proposal with
-              | Some p -> Toast.show (sprintf "%s's team approved" p.proposer)
-              | None -> ())
-            else if String.equal phase "PROPOSAL_VOTE"
-            then (
-              match game.current_proposal with
-              | Some p -> Toast.show (sprintf "%s has proposed a team" p.proposer)
-              | None -> ()));
-          !m
-      in
-      set final)
+       let new_data = Parse.lobby_data snap_data in
+       let game = Game.create new_data.game ~role_map:Avalonlib.role_map in
+       let old_data = lob.data in
+       let base =
+         { m with Model.lobby = Some { lob with data = Some new_data; game = Some game } }
+       in
+       let connected_case (m : Model.t) =
+         let m =
+           { m with
+             Model.lobby = Option.map m.lobby ~f:(fun l -> { l with connected = true })
+           }
+         in
+         let m = update_player_list ~users:new_data.users ~notify:false m in
+         let m =
+           if List.is_empty new_data.game.roles
+           then m
+           else update_roles ~roles:new_data.game.roles m
+         in
+         Ffi.set_document_title
+           (sprintf "Avalon - %s - %s" lob.name (Derived.user_name m));
+         m
+       in
+       let final =
+         match old_data with
+         | None -> connected_case base
+         | Some old when not (String.equal old.name new_data.name) -> connected_case base
+         | Some old ->
+           let m = ref base in
+           if not (String.equal old.admin.uid new_data.admin.uid)
+           then (
+             let is_admin =
+               match !m.user with
+               | Some u -> String.equal u.uid new_data.admin.uid
+               | None -> false
+             in
+             Toast.show
+               (if is_admin
+                then "You are now lobby administrator"
+                else sprintf "%s became lobby administrator" new_data.admin.name));
+           let old_keys = List.map old.users ~f:fst in
+           let new_keys = String.Set.of_list (List.map new_data.users ~f:fst) in
+           let users_changed =
+             List.length old.users <> List.length new_data.users
+             || not (List.for_all old_keys ~f:(Set.mem new_keys))
+           in
+           if users_changed
+           then m := update_player_list ~users:new_data.users ~notify:true !m;
+           if not (equal_game_state old.game.state new_data.game.state)
+           then
+             if equal_game_state new_data.game.state Active
+             then (
+               m := update_roles ~roles:new_data.game.roles !m;
+               m := { !m with modal = Start_game })
+             else m := { !m with modal = End_game; show_role_sheet = false }
+           else if not (String.equal old.game.phase new_data.game.phase)
+           then (
+             let phase = new_data.game.phase in
+             if String.equal phase "TEAM_PROPOSAL"
+             then
+               if game.current_proposal_idx > 0
+               then (
+                 match Game.last_proposal game with
+                 | Some p -> Toast.show (sprintf "%s's team rejected" p.proposer)
+                 | None -> ())
+               else m := { !m with modal = Mission_result }
+             else if String.equal phase "ASSASSINATION"
+             then m := { !m with modal = Mission_result }
+             else if String.equal phase "MISSION_VOTE"
+             then (
+               match game.current_proposal with
+               | Some p -> Toast.show (sprintf "%s's team approved" p.proposer)
+               | None -> ())
+             else if String.equal phase "PROPOSAL_VOTE"
+             then (
+               match game.current_proposal with
+               | Some p -> Toast.show (sprintf "%s has proposed a team" p.proposer)
+               | None -> ()));
+           !m
+       in
+       set final)
 ;;
 
 let subscribe_to_lobby name =
@@ -273,7 +281,10 @@ let subscribe_to_lobby name =
   | Some _ -> ()
   | None ->
     let uid = Option.value_map m.user ~default:"" ~f:(fun u -> u.uid) in
-    set { m with lobby = Some { name; connected = false; data = None; role = None; game = None } };
+    set
+      { m with
+        lobby = Some { name; connected = false; data = None; role = None; game = None }
+      };
     let u1 =
       Firebase.on_snapshot
         (Firebase.doc [ "lobbies"; name ])
@@ -311,13 +322,13 @@ let user_doc_updated snap =
     let u = Parse.user_data d in
     update ~f:(fun m -> { m with user = Some u });
     let m = model () in
-    match u.lobby, m.lobby with
-    | None, Some lob ->
-      let old = lob.name in
-      unsubscribe_from_lobby ();
-      Toast.show (sprintf "You've been disconnected from %s" old)
-    | Some lobby_name, None -> subscribe_to_lobby lobby_name
-    | _ -> ()
+    (match u.lobby, m.lobby with
+     | None, Some lob ->
+       let old = lob.name in
+       unsubscribe_from_lobby ();
+       Toast.show (sprintf "You've been disconnected from %s" old)
+     | Some lobby_name, None -> subscribe_to_lobby lobby_name
+     | _ -> ())
 ;;
 
 let on_auth_state_changed (user : Firebase.user option) =
@@ -348,17 +359,17 @@ let on_auth_state_changed (user : Firebase.user option) =
   | Some user ->
     (* Call login unconditionally (even for anonymous users with no email) so the server
        creates the user doc; otherwise createLobby fails with "No such user". *)
-    Api.login
-      (Firebase.email user)
-      ~on_err:(fun _ -> Toast.show "Couldn't reach the game server. Some actions may fail — try reloading.");
+    Api.login (Firebase.email user) ~on_err:(fun _ ->
+      Toast.show "Couldn't reach the game server. Some actions may fail — try reloading.");
     let unsub =
       Firebase.on_snapshot
         (Firebase.doc [ "users"; Firebase.uid user ])
         ~on_next:user_doc_updated
-        (* Don't hang on a listener error: fall back to a minimal user from auth so the UI
-           still renders (login -> lobby-select) instead of spinning forever. *)
+          (* Don't hang on a listener error: fall back to a minimal user from auth so the
+             UI still renders (login -> lobby-select) instead of spinning forever. *)
         ~on_error:(fun _ ->
-          update ~f:(fun m -> { m with auth_initialized = true; user = synthetic_user () });
+          update ~f:(fun m ->
+            { m with auth_initialized = true; user = synthetic_user () });
           Toast.show "Couldn't sync your profile. Try reloading.")
     in
     user_doc_unsub := Some unsub;
@@ -385,12 +396,12 @@ let init () =
                then reload."
         }))
     (fun () ->
-    Firebase.init firebase_config;
-    if Ffi.url_has_param "purchaseSuccess"
-    then Ffi.alert "Thank you. Your support means a lot."
-    else if Ffi.url_has_param "purchaseCanceled"
-    then Ffi.alert "Maybe next time?";
-    Firebase.on_auth_state_changed (fun user -> on_auth_state_changed user))
+      Firebase.init firebase_config;
+      if Ffi.url_has_param "purchaseSuccess"
+      then Ffi.alert "Thank you. Your support means a lot."
+      else if Ffi.url_has_param "purchaseCanceled"
+      then Ffi.alert "Maybe next time?";
+      Firebase.on_auth_state_changed (fun user -> on_auth_state_changed user))
 ;;
 
 (* ---- actions invoked by the UI ---- *)
@@ -429,12 +440,7 @@ let leave_lobby () =
 ;;
 
 let kick_player ?(on_ok = noop_ok) ?(on_err = toast_err) name =
-  Api.kick_player
-    ~lobby:(lobby_name ())
-    ~name
-    ~on_ok:(fun _ -> on_ok ())
-    ~on_err
-    ()
+  Api.kick_player ~lobby:(lobby_name ()) ~name ~on_ok:(fun _ -> on_ok ()) ~on_err ()
 ;;
 
 let cancel_game ?(on_ok = noop_ok) ?(on_err = toast_err) () =
@@ -521,18 +527,16 @@ let sign_in_anonymously ?(on_err = noop_err) () =
 
 let email_regexp = Regexp.regexp "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
 let email_regex_ok email = Option.is_some (Regexp.string_match email_regexp email 0)
-
 let whitelist = [ "gmail.com"; "yahoo.com"; "outlook.com"; "hotmail.com"; "live.com" ]
 
 let send_sign_in_link ~email ~on_ok ~on_err =
   let hostname = Ffi.window_origin () ^ "/" in
-  let url = Js.to_string (Js.encodeURI (Js.string (hostname ^ "?confirmEmail=" ^ email))) in
+  let url =
+    Js.to_string (Js.encodeURI (Js.string (hostname ^ "?confirmEmail=" ^ email)))
+  in
   let settings = { Firebase.url; handle_code_in_app = true } in
-  Firebase.send_sign_in_link_to_email
-    ~email
-    ~settings
-    ~on_ok
-    ~on_err:(fun e -> on_err (Firebase.error_message e))
+  Firebase.send_sign_in_link_to_email ~email ~settings ~on_ok ~on_err:(fun e ->
+    on_err (Firebase.error_message e))
 ;;
 
 let submit_email_addr ?(on_ok = noop_ok) ?(on_err = noop_err) email =
@@ -547,7 +551,7 @@ let submit_email_addr ?(on_ok = noop_ok) ?(on_err = noop_err) email =
     let proceed () = send_sign_in_link ~email ~on_ok ~on_err in
     if List.mem whitelist domain ~equal:String.equal
     then proceed ()
-    else (
+    else
       Ffi.fetch
         ("https://api.mailcheck.ai/domain/" ^ domain)
         ~on_err:(fun _ -> on_err "Cannot verify email. Try again later")
@@ -560,7 +564,7 @@ let submit_email_addr ?(on_ok = noop_ok) ?(on_err = noop_err) email =
               let disposable = Ffi.field_bool data "disposable" in
               if mx && not disposable
               then proceed ()
-              else on_err "This email address appears to be invalid or disposable"))))
+              else on_err "This email address appears to be invalid or disposable")))
 ;;
 
 (* ---- UI-only state setters ---- *)

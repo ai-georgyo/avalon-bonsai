@@ -22,5 +22,6 @@ let show (message : string) : unit =
   node##.textContent := Js.some (Js.string message);
   Dom.appendChild container node;
   let remove () = Dom.removeChild container node in
-  ignore (Dom_html.window##setTimeout (Js.wrap_callback remove) (Js.number_of_float 2500.))
+  ignore
+    (Dom_html.window##setTimeout (Js.wrap_callback remove) (Js.number_of_float 2500.))
 ;;

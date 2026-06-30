@@ -81,7 +81,15 @@ let create (game : game_data) ~(role_map : role String.Map.t) : t =
     List.map game.missions ~f:(fun m ->
       { m; evil_on_team = List.filter m.team ~f:(fun n -> Set.mem evil_set n) })
   in
-  { game; outcome; roles_by_name; names_by_role; evil_players; evil_set; good_players; missions }
+  { game
+  ; outcome
+  ; roles_by_name
+  ; names_by_role
+  ; evil_players
+  ; evil_set
+  ; good_players
+  ; missions
+  }
 ;;
 
 let name_of_role t role = Map.find t.names_by_role role
@@ -91,8 +99,7 @@ let role_proposes_role t proposer_role role_proposed =
   match name_of_role t proposer_role, name_of_role t role_proposed with
   | Some pn, Some rn ->
     List.exists t.missions ~f:(fun me ->
-      List.exists me.m.proposals ~f:(fun p ->
-        str_eq p.proposer pn && mem p.team rn))
+      List.exists me.m.proposals ~f:(fun p -> str_eq p.proposer pn && mem p.team rn))
   | _ -> false
 ;;
 
@@ -136,7 +143,8 @@ let merlin_sends_evil_team t =
              && List.length me.evil_on_team >= me.m.fails_required ->
         Some
           { title = "Traitor Merlin"
-          ; body = sprintf "Merlin sent an evil team with %s" (join_with_and me.evil_on_team)
+          ; body =
+              sprintf "Merlin sent an evil team with %s" (join_with_and me.evil_on_team)
           }
       | _ -> None)
 ;;
@@ -208,7 +216,8 @@ let failure_to_coordinate t =
 
 let perfect_coordination t =
   List.find_mapi t.missions ~f:(fun idx me ->
-    if List.length me.evil_on_team > me.m.num_fails && me.m.num_fails = me.m.fails_required
+    if List.length me.evil_on_team > me.m.num_fails
+       && me.m.num_fails = me.m.fails_required
     then
       Some
         { title = "Same wavelength"
@@ -253,7 +262,8 @@ let clean_sweep t =
     when equal_mission_state m0.m.state m1.m.state
          && equal_mission_state m1.m.state m2.m.state ->
     if equal_mission_state m0.m.state Fail
-    then Some { title = "Nasty, brutish, and short"; body = "Evil team dominated the game" }
+    then
+      Some { title = "Nasty, brutish, and short"; body = "Evil team dominated the game" }
     else if equal_outcome_state t.outcome.state Evil_win
     then
       Some
@@ -323,7 +333,8 @@ let universal_acclaim t =
       then
         Some
           { title = "Universal acclaim"
-          ; body = sprintf "Everyone voted for %s's proposal on mission %d" p.proposer (idx + 1)
+          ; body =
+              sprintf "Everyone voted for %s's proposal on mission %d" p.proposer (idx + 1)
           }
       else None))
 ;;
@@ -368,7 +379,7 @@ let reversal_of_fortune t =
   with
   | Some m0, Some m1, Some m2, Some m3, Some m4
     when equal_mission_state m0.m.state m1.m.state
-         && not (equal_mission_state m1.m.state m2.m.state)
+         && (not (equal_mission_state m1.m.state m2.m.state))
          && equal_mission_state m2.m.state m3.m.state
          && equal_mission_state m3.m.state m4.m.state ->
     if equal_mission_state m0.m.state Fail && equal_outcome_state t.outcome.state Good_win
@@ -481,9 +492,7 @@ let almost_lost t =
 ;;
 
 let psychic_powers t =
-  let players =
-    String.Table.create ()
-  in
+  let players = String.Table.create () in
   List.iter t.game.players ~f:(fun name ->
     Hashtbl.set players ~key:name ~data:{ name; good_proposals = 0; bad_proposals = 0 });
   List.iter t.missions ~f:(fun me ->
@@ -495,19 +504,23 @@ let psychic_powers t =
         if evil_count < me.m.fails_required
         then ps.good_proposals <- ps.good_proposals + 1
         else ps.bad_proposals <- ps.bad_proposals + 1));
-  (* Match the JS: iterate in player (seat) order and use a stable sort, so ties resolve to
-     the earliest-seated player as Object.values(keyBy(...)).sort() does. *)
+  (* Match the JS: iterate in player (seat) order and use a stable sort, so ties resolve
+     to the earliest-seated player as Object.values(keyBy(...)).sort() does. *)
   let perfect =
     List.filter_map t.game.players ~f:(Hashtbl.find players)
     |> List.filter ~f:(fun p -> p.bad_proposals = 0 && p.good_proposals >= 2)
-    |> List.stable_sort ~compare:(fun a b -> Int.compare b.good_proposals a.good_proposals)
+    |> List.stable_sort ~compare:(fun a b ->
+      Int.compare b.good_proposals a.good_proposals)
   in
   match perfect with
   | top :: _ ->
     Some
       { title = "Actual Merlin"
       ; body =
-          sprintf "%s proposed %d perfect teams and no bad teams" top.name top.good_proposals
+          sprintf
+            "%s proposed %d perfect teams and no bad teams"
+            top.name
+            top.good_proposals
       }
   | [] -> None
 ;;
@@ -534,7 +547,11 @@ let unanimous_rejection t =
       then
         Some
           { title = "Hard pass"
-          ; body = sprintf "%s's proposal on mission %d was rejected by everyone" p.proposer (idx + 1)
+          ; body =
+              sprintf
+                "%s's proposal on mission %d was rejected by everyone"
+                p.proposer
+                (idx + 1)
           }
       else None))
 ;;
@@ -591,7 +608,9 @@ let evil_everywhere t =
   in
   if List.length completed >= 3
      && List.for_all completed ~f:(fun me -> not (List.is_empty me.evil_on_team))
-  then Some { title = "Omnipresent evil"; body = "Every mission had at least one evil player" }
+  then
+    Some
+      { title = "Omnipresent evil"; body = "Every mission had at least one evil player" }
   else None
 ;;
 
@@ -606,7 +625,9 @@ let loyal_to_a_fault t =
   else
     List.find_map t.game.players ~f:(fun player ->
       if List.for_all non_hammer ~f:(fun p -> mem p.votes player)
-      then Some { title = "Yes-man"; body = sprintf "%s approved every single proposal" player }
+      then
+        Some
+          { title = "Yes-man"; body = sprintf "%s approved every single proposal" player }
       else None)
 ;;
 
@@ -622,12 +643,17 @@ let contrarian t =
     List.find_map t.game.players ~f:(fun player ->
       if List.for_all approved_non_hammer ~f:(fun p -> not (mem p.votes player))
       then
-        Some { title = "Contrarian"; body = sprintf "%s rejected every proposal that got approved" player }
+        Some
+          { title = "Contrarian"
+          ; body = sprintf "%s rejected every proposal that got approved" player
+          }
       else None)
 ;;
 
 let one_man_army t =
-  let failed = List.filter t.missions ~f:(fun me -> equal_mission_state me.m.state Fail) in
+  let failed =
+    List.filter t.missions ~f:(fun me -> equal_mission_state me.m.state Fail)
+  in
   if List.length failed < 2
   then None
   else (
@@ -642,7 +668,9 @@ let one_man_army t =
       Some
         { title = "One-man army"
         ; body =
-            sprintf "%s was the only evil player on every failed mission" (List.hd_exn evil_on_all)
+            sprintf
+              "%s was the only evil player on every failed mission"
+              (List.hd_exn evil_on_all)
         }
     else None)
 ;;
@@ -656,7 +684,11 @@ let evil_ghost t =
   else
     List.find_map t.evil_players ~f:(fun player ->
       if List.for_all completed ~f:(fun me -> not (mem me.m.team player))
-      then Some { title = "Ghost"; body = sprintf "%s was evil but never went on a single mission" player }
+      then
+        Some
+          { title = "Ghost"
+          ; body = sprintf "%s was evil but never went on a single mission" player
+          }
       else None)
 ;;
 
@@ -668,7 +700,8 @@ let trojan_horse t =
     then
       Some
         { title = "Trojan horse"
-        ; body = sprintf "Mission %d had a majority evil team (%d of %d)" (idx + 1) e total
+        ; body =
+            sprintf "Mission %d had a majority evil team (%d of %d)" (idx + 1) e total
         }
     else None)
 ;;
@@ -702,7 +735,11 @@ let rejection_streak t =
       | Approved -> streak := 0
       | Pending -> ()));
   if !max_streak >= 4
-  then Some { title = "Nobody likes anyone"; body = sprintf "%d proposals were rejected in a row" !max_streak }
+  then
+    Some
+      { title = "Nobody likes anyone"
+      ; body = sprintf "%d proposals were rejected in a row" !max_streak
+      }
   else None
 ;;
 
@@ -742,7 +779,9 @@ let proposer_curse t =
       if equal_proposal_state p.state Rejected
       then (
         if not (Hashtbl.mem counts p.proposer) then Queue.enqueue order p.proposer;
-        Hashtbl.update counts p.proposer ~f:(function None -> 1 | Some n -> n + 1))));
+        Hashtbl.update counts p.proposer ~f:(function
+          | None -> 1
+          | Some n -> n + 1))));
   let sorted =
     Queue.to_list order
     |> List.map ~f:(fun player -> player, Hashtbl.find_exn counts player)
@@ -750,7 +789,10 @@ let proposer_curse t =
   in
   match sorted with
   | (player, count) :: _ when count >= 3 ->
-    Some { title = "Cursed proposer"; body = sprintf "%s had %d proposals rejected" player count }
+    Some
+      { title = "Cursed proposer"
+      ; body = sprintf "%s had %d proposals rejected" player count
+      }
   | _ -> None
 ;;
 
@@ -763,7 +805,9 @@ let last_stand t =
     let successes = List.count first4 ~f:(equal_mission_state Success) in
     let fails = List.count first4 ~f:(equal_mission_state Fail) in
     if successes = 2 && fails = 2
-    then Some { title = "Last stand"; body = "The score was 2-2 going into the final mission" }
+    then
+      Some
+        { title = "Last stand"; body = "The score was 2-2 going into the final mission" }
     else None
 ;;
 
@@ -772,7 +816,10 @@ let perfect_assassin t =
   | Some target when equal_outcome_state t.outcome.state Evil_win ->
     (match Map.find t.roles_by_name target with
      | Some ra when str_eq ra.role "MERLIN" ->
-       Some { title = "Bullseye"; body = "The assassin correctly identified and killed Merlin" }
+       Some
+         { title = "Bullseye"
+         ; body = "The assassin correctly identified and killed Merlin"
+         }
      | _ -> None)
   | _ -> None
 ;;
@@ -790,8 +837,8 @@ let oberon_saboteur t =
           { title = "Who did that?"
           ; body =
               sprintf
-                "Oberon failed mission %d alongside evil allies who didn't know they were \
-                 there"
+                "Oberon failed mission %d alongside evil allies who didn't know they \
+                 were there"
                 (idx + 1)
           }
       else None)
