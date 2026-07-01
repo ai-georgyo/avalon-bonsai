@@ -46,7 +46,7 @@
     # Only x86_64-linux is verified. The OxCaml toolchain is linux-oriented; aarch64-linux
     # likely works but is untested, and darwin would need separate work — add systems here
     # once verified.
-    flake-utils.lib.eachSystem [ "x86_64-linux" ] (
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
