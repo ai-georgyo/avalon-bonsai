@@ -7,9 +7,9 @@ name: Nix
 # fast. For heavy use, point this at a Cachix cache instead (the GHA cache is capped at 10 GB
 # per repo, and the OxCaml closure is large).
 #
-# `--impure` is required: several oxcaml preview packages use git sources without a pinned
-# sha1, which opam-nix can only fetch in impure mode. flake.lock still pins the opam repos
-# themselves, so resolution is reproducible even though those few sources are fetched live.
+# The build is fully pure (no --impure): the one dependency with an unpinned git source
+# (zarith) is pinned to an explicit rev + hash in flake.nix, and flake.lock pins the opam
+# repositories, so resolution and fetching are reproducible.
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
 
       - name: Build the flake (client bundle + avalon_core unit tests)
         # doCheck = true in the derivation runs `dune runtest test`, so this builds and tests.
-        run: nix build --impure --print-build-logs .#default
+        run: nix build --print-build-logs .#default
 
       - name: Stage the client bundle
         run: |

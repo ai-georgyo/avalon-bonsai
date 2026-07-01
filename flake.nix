@@ -76,16 +76,29 @@
           }).overrideScope
             overlay;
 
-        # The OxCaml compiler build assumes a couple of things the pure Nix sandbox lacks:
-        #   - its Makefiles hardcode `SHELL = /usr/bin/env bash` (no /usr/bin/env in sandbox);
-        #   - its `install` target shells out to `rsync` (not in the default stdenv).
         overlay = final: prev: {
+          # The OxCaml compiler build assumes a couple of things the pure Nix sandbox lacks:
+          #   - its Makefiles hardcode `SHELL = /usr/bin/env bash` (no /usr/bin/env in sandbox);
+          #   - its `install` target shells out to `rsync` (not in the default stdenv).
           oxcaml-compiler = prev.oxcaml-compiler.overrideAttrs (oa: {
             nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [ pkgs.rsync ];
             postPatch = (oa.postPatch or "") + ''
               find . -name 'Makefile*' -type f \
                 -exec sed -i 's@^SHELL *= */usr/bin/env bash@SHELL = bash@' {} +
             '';
+          });
+
+          # zarith's opam entry points at an unpinned git branch
+          # (`git+https://github.com/avsm/zarith.git#oxcaml`), the one dependency that forced
+          # `--impure`. Pin it to an explicit rev + hash so the build is pure and reproducible.
+          # To update: bump the rev and refresh the hash with
+          #   nix-prefetch-git --url https://github.com/avsm/zarith.git --rev <rev>
+          zarith = prev.zarith.overrideAttrs (_: {
+            src = pkgs.fetchgit {
+              url = "https://github.com/avsm/zarith.git";
+              rev = "50e84d371ee53e9ff62e4e7fbf17bcb903d2d846";
+              hash = "sha256-+JLfOF+GCT9cfCDaIkqxMHvR0Fy6dX99F4bHIk4USn0=";
+            };
           });
         };
 
