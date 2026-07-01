@@ -49,32 +49,43 @@
         pkgs = nixpkgs.legacyPackages.${system};
         on = opam-nix.lib.${system};
 
-        # Resolve the OxCaml compiler plus every library the dune files reference. "*" lets
-        # opam pick the matching preview versions from the oxcaml repos.
-        scope =
-          (on.queryToScope {
-            repos = [
-              oxcaml-opam-dev
-              oxcaml-opam
-              opam-repository
-            ];
-          } {
-            ocaml-variants = "5.2.0+ox";
-            dune = "*";
-            core = "*";
-            bonsai = "*";
-            bonsai_web = "*";
-            bonsai_web_components = "*";
-            virtual_dom = "*";
-            js_of_ocaml = "*";
-            js_of_ocaml-ppx = "*";
-            js_of_ocaml-compiler = "*";
-            ppx_jane = "*";
-            ppx_css = "*";
-            ppx_html = "*";
-            ppx_inline_test = "*";
-          }).overrideScope
-            overlay;
+        repos = [
+          oxcaml-opam-dev
+          oxcaml-opam
+          opam-repository
+        ];
+
+        # The OxCaml compiler plus every library the dune files reference. "*" lets opam pick
+        # the matching preview versions from the oxcaml repos.
+        query = {
+          ocaml-variants = "5.2.0+ox";
+          dune = "*";
+          core = "*";
+          bonsai = "*";
+          bonsai_web = "*";
+          bonsai_web_components = "*";
+          virtual_dom = "*";
+          js_of_ocaml = "*";
+          js_of_ocaml-ppx = "*";
+          js_of_ocaml-compiler = "*";
+          ppx_jane = "*";
+          ppx_css = "*";
+          ppx_html = "*";
+          ppx_inline_test = "*";
+        };
+
+        # Resolving the query against the large oxcaml opam repo runs opam's solver for >60s,
+        # which trips OPAMSOLVERTIMEOUT under `nix build` IFD on a slow CI runner. opam-nix
+        # gives no way to raise that timeout, so instead we MATERIALIZE the resolution: run the
+        # solver once locally and commit its output (package-defs.json). CI then reads that file
+        # via materializedDefsToScope and never runs the solver at all. Regenerate with:
+        #   nix build .#materialize && cp -L result package-defs.json   (add --impure if needed)
+        materialize = on.materialize {
+          inherit repos;
+          regenCommand = [ "nix" "build" ".#materialize" ];
+        } query;
+
+        scope = (on.materializedDefsToScope { } ./package-defs.json).overrideScope overlay;
 
         overlay = final: prev: {
           # The OxCaml compiler build assumes a couple of things the pure Nix sandbox lacks:
@@ -156,6 +167,11 @@
       {
         packages.default = avalon-bonsai;
         packages.avalon-bonsai = avalon-bonsai;
+
+        # `nix build .#materialize && cp -L result package-defs.json` regenerates the committed
+        # resolution (e.g. after bumping the opam repo inputs). This is the only step that runs
+        # opam's solver; the normal build never does.
+        packages.materialize = pkgs.runCommand "package-defs.json" { } "cp ${materialize} $out";
 
         # `nix flake check` builds the bundle and runs the unit tests.
         checks.default = avalon-bonsai;
