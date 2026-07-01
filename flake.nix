@@ -7,9 +7,12 @@
   # `{post}` patch-guard disjunctions that defeat dune's own package manager). The compiler
   # is built from source; expect a slow first build unless a binary cache is configured.
   inputs = {
-    opam-nix.url = "github:tweag/opam-nix";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    opam-nix = {
+      url = "github:tweag/opam-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     flake-utils.url = "github:numtide/flake-utils";
-    nixpkgs.follows = "opam-nix/nixpkgs";
 
     # The opam repositories the local 5.2.0+ox switch uses, pinned as flake inputs so the
     # resolution is reproducible. Order = search priority: oxcaml dev, then oxcaml stable,
@@ -82,7 +85,11 @@
         #   nix build .#materialize && cp -L result package-defs.json   (add --impure if needed)
         materialize = on.materialize {
           inherit repos;
-          regenCommand = [ "nix" "build" ".#materialize" ];
+          regenCommand = [
+            "nix"
+            "build"
+            ".#materialize"
+          ];
         } query;
 
         scope = (on.materializedDefsToScope { } ./package-defs.json).overrideScope overlay;
@@ -179,6 +186,9 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ avalon-bonsai ];
         };
+
+        formatter = pkgs.nixfmt-tree;
+
       }
     );
 }

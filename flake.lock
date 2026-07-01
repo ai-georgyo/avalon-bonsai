@@ -70,11 +70,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1751792365,
-        "narHash": "sha256-J1kI6oAj25IG4EdVlg2hQz8NZTBNYvIS0l4wpr9KcUo=",
+        "lastModified": 1782723713,
+        "narHash": "sha256-oPXCU/SSUokcGaJREHibG1CBX3+s/W7orDWQOZDsEeQ=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "1fd8bada0b6117e6c7eb54aad5813023eed37ccb",
+        "rev": "b5aa0fbd538984f6e3d201be0005b4463d8b09f8",
         "type": "github"
       },
       "original": {
@@ -137,7 +137,9 @@
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils_2",
         "mirage-opam-overlays": "mirage-opam-overlays",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
         "nixpkgs-llvm17": "nixpkgs-llvm17",
         "nixpkgs-python38": "nixpkgs-python38",
         "nixpkgs-python39": "nixpkgs-python39",
@@ -180,11 +182,11 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1782821467,
-        "narHash": "sha256-0IvA5T5jYTF25AbrQdTuX+YrysG4nlG+6VK8sTwc6TI=",
+        "lastModified": 1782852723,
+        "narHash": "sha256-yPPx3gFJu5JUELJ7UiItaqnS5Gh+018Wp/Gp/lEv5/I=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "8cd35acddd18fa903782ac90de78467ca3e3b506",
+        "rev": "89a06fb4a7950d434fafca1593197d35ae530eb2",
         "type": "github"
       },
       "original": {
@@ -251,10 +253,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": [
-          "opam-nix",
-          "nixpkgs"
-        ],
+        "nixpkgs": "nixpkgs",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
         "oxcaml-opam": "oxcaml-opam",
